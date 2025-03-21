@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { View, StyleSheet, Alert, ScrollView, SafeAreaView, Platform, StatusBar, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, Alert, ScrollView, SafeAreaView, Platform, StatusBar, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { TextInput, Button, Title, Switch, Text, Surface } from 'react-native-paper';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useGoals } from '../contexts/GoalContext';
@@ -37,9 +37,8 @@ const AddGoalScreen: React.FC<Props> = ({ navigation }) => {
 
       await addGoal(goalData);
 
-      Alert.alert('Success', 'Goal created successfully!', [
-        { text: 'OK', onPress: () => navigation.goBack() }
-      ]);
+      // Navigate back directly without showing an alert
+      navigation.goBack();
     } catch (error) {
       Alert.alert('Error', error instanceof Error ? error.message : 'Failed to create goal');
       setLoading(false);
@@ -114,29 +113,28 @@ const AddGoalScreen: React.FC<Props> = ({ navigation }) => {
             </View>
 
             <View style={styles.buttonContainer}>
-              <Button
-                mode="contained"
+              <TouchableOpacity
+                style={[styles.saveButton, { backgroundColor: '#35CAFC' }]}
                 onPress={handleSave}
-                loading={loading}
                 disabled={loading}
-                style={styles.saveButton}
-                contentStyle={styles.buttonContent}
-                labelStyle={styles.buttonLabel}
-                color="#35CAFC"
               >
-                <Text style={styles.buttonText}>Create Goal</Text>
-              </Button>
+                {loading ? (
+                  <ActivityIndicator color="white" size="small" />
+                ) : (
+                  <Text style={{ color: 'white', fontSize: 16, fontWeight: '600' }}>
+                    Create Goal
+                  </Text>
+                )}
+              </TouchableOpacity>
 
-              <Button
-                mode="outlined"
-                onPress={() => navigation.goBack()}
+              <TouchableOpacity
                 style={styles.cancelButton}
-                contentStyle={styles.buttonContent}
-                labelStyle={styles.buttonLabel}
-                color="#FF5F5F"
+                onPress={() => navigation.goBack()}
               >
-                <Text style={styles.cancelText}>Cancel</Text>
-              </Button>
+                <Text style={{ color: '#FF5F5F', fontSize: 16, fontWeight: '600' }}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
             </View>
           </Surface>
         </ScrollView>
@@ -240,28 +238,17 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderRadius: 12,
     elevation: 2,
-  },
-  buttonContent: {
-    height: 50,
-  },
-  buttonLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+    paddingVertical: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cancelButton: {
     borderRadius: 12,
     borderColor: '#FF5F5F',
     borderWidth: 1,
-  },
-  cancelText: {
-    color: '#FF5F5F',
-    fontSize: 16,
-    fontWeight: '600',
+    paddingVertical: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 

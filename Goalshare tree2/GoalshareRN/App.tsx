@@ -4,7 +4,13 @@ import { Provider as PaperProvider, DefaultTheme } from 'react-native-paper';
 import Navigation from './src/navigation';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { GoalProvider } from './src/contexts/GoalContext';
-import { StatusBar } from 'react-native';
+import { StatusBar, LogBox } from 'react-native';
+
+// Ignore specific warnings for animation
+LogBox.ignoreLogs([
+  'ViewPropTypes will be removed from React Native',
+  'Animated: `useNativeDriver` was not specified'
+]);
 
 // Custom theme with playful colors inspired by Snapchat and BeReal
 const theme = {
@@ -56,7 +62,7 @@ export default function App() {
     <AuthProvider>
       <GoalProvider>
         <PaperProvider theme={theme}>
-          <StatusBar barStyle="dark-content" backgroundColor={theme.colors.background} />
+          <StatusBar barStyle="dark-content" backgroundColor={theme.colors.background} animated={true} />
           <Navigation />
         </PaperProvider>
       </GoalProvider>
