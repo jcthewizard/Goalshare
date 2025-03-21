@@ -1,3 +1,4 @@
+/* eslint-disable */
 // @ts-nocheck
 import React, { useState } from 'react';
 import {
@@ -55,73 +56,88 @@ const ProfileScreen = () => {
     }
   };
 
+  // Common header with profile info
+  const renderProfileHeader = () => (
+    <>
+      <LinearGradient
+        colors={['#FF5F5F', '#FF8C8C']}
+        style={styles.profileHeader}
+      >
+        <View style={styles.profileInfo}>
+          <View style={styles.avatarContainer}>
+            {user?.photoURL ? (
+              <Image
+                source={{ uri: user.photoURL }}
+                style={styles.avatarImage}
+              />
+            ) : (
+              <Avatar.Text
+                size={80}
+                label={user?.displayName?.substring(0, 2)?.toUpperCase() || '?'}
+                color="#FFF"
+                style={styles.avatar}
+                labelStyle={{ fontWeight: '700' }}
+              />
+            )}
+          </View>
+          <Text style={styles.userName}>{user?.displayName || 'User'}</Text>
+          <Text style={styles.userEmail}>{user?.email}</Text>
+        </View>
+      </LinearGradient>
+
+      {/* Content Tabs */}
+      <View style={styles.tabsContainer}>
+        <View style={styles.tabs}>
+          <TouchableOpacity
+            style={[
+              styles.tab,
+              activeTab === 'stats' && styles.activeTab
+            ]}
+            onPress={() => setActiveTab('stats')}
+          >
+            <Text style={[
+              styles.tabText,
+              activeTab === 'stats' && styles.activeTabText
+            ]}>
+              Stats
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.tab,
+              activeTab === 'friends' && styles.activeTab
+            ]}
+            onPress={() => setActiveTab('friends')}
+          >
+            <Text style={[
+              styles.tabText,
+              activeTab === 'friends' && styles.activeTabText
+            ]}>
+              Friends
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </>
+  );
+
+  // Render the logout button
+  const renderLogoutButton = () => (
+    <TouchableOpacity
+      style={styles.logoutButton}
+      onPress={handleLogout}
+    >
+      <Text style={styles.logoutButtonText}>Logout</Text>
+    </TouchableOpacity>
+  );
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Profile Header */}
-        <LinearGradient
-          colors={['#FF5F5F', '#FF8C8C']}
-          style={styles.profileHeader}
-        >
-          <View style={styles.profileInfo}>
-            <View style={styles.avatarContainer}>
-              {user?.photoURL ? (
-                <Image
-                  source={{ uri: user.photoURL }}
-                  style={styles.avatarImage}
-                />
-              ) : (
-                <Avatar.Text
-                  size={80}
-                  label={user?.displayName?.substring(0, 2)?.toUpperCase() || '?'}
-                  color="#FFF"
-                  style={styles.avatar}
-                  labelStyle={{ fontWeight: '700' }}
-                />
-              )}
-            </View>
-            <Text style={styles.userName}>{user?.displayName || 'User'}</Text>
-            <Text style={styles.userEmail}>{user?.email}</Text>
-          </View>
-        </LinearGradient>
+      {activeTab === 'stats' ? (
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          {renderProfileHeader()}
 
-        {/* Content Tabs */}
-        <View style={styles.tabsContainer}>
-          <View style={styles.tabs}>
-            <TouchableOpacity
-              style={[
-                styles.tab,
-                activeTab === 'stats' && styles.activeTab
-              ]}
-              onPress={() => setActiveTab('stats')}
-            >
-              <Text style={[
-                styles.tabText,
-                activeTab === 'stats' && styles.activeTabText
-              ]}>
-                Stats
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.tab,
-                activeTab === 'friends' && styles.activeTab
-              ]}
-              onPress={() => setActiveTab('friends')}
-            >
-              <Text style={[
-                styles.tabText,
-                activeTab === 'friends' && styles.activeTabText
-              ]}>
-                Friends
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Tab Content */}
-        {activeTab === 'stats' ? (
-          /* Stats Section */
+          {/* Stats Section */}
           <View style={styles.statsSection}>
             <Text style={styles.sectionTitle}>Your Progress</Text>
 
@@ -210,19 +226,18 @@ const ProfileScreen = () => {
               </Card.Content>
             </Card>
           </View>
-        ) : (
-          /* Friends Section */
-          <FriendsList />
-        )}
 
-        {/* Logout Button */}
-        <TouchableOpacity
-          style={styles.logoutButton}
-          onPress={handleLogout}
-        >
-          <Text style={styles.logoutButtonText}>Logout</Text>
-        </TouchableOpacity>
-      </ScrollView>
+          {renderLogoutButton()}
+        </ScrollView>
+      ) : (
+        <View style={styles.container}>
+          {renderProfileHeader()}
+          <View style={styles.friendsContainer}>
+            <FriendsList />
+          </View>
+          {renderLogoutButton()}
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -440,6 +455,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#FF5F5F',
+  },
+  friendsContainer: {
+    padding: 20,
   },
 });
 

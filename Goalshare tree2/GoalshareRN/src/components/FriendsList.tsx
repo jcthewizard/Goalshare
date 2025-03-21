@@ -1,3 +1,4 @@
+/* eslint-disable */
 // @ts-nocheck
 import React, { useState } from 'react';
 import {
@@ -66,21 +67,27 @@ export const FriendsList = () => {
     setSearchResults([]);
   };
 
+  // Helper function to get initials safely
+  const getInitials = (name) => {
+    if (!name) return '??';
+    return name.substring(0, 2).toUpperCase();
+  };
+
   const renderFriendItem = ({ item }) => (
     <Card style={styles.friendCard}>
       <View style={styles.friendItem}>
-        {item.user.profilePicture ? (
-          <Image source={{ uri: item.user.profilePicture }} style={styles.avatar} />
+        {item.user?.photoURL ? (
+          <Image source={{ uri: item.user.photoURL }} style={styles.avatar} />
         ) : (
           <Avatar.Text
             size={50}
-            label={item.user.username.substring(0, 2).toUpperCase()}
+            label={getInitials(item.user?.displayName)}
             style={styles.avatarText}
           />
         )}
         <View style={styles.friendInfo}>
-          <Text style={styles.friendName}>{item.user.username}</Text>
-          <Text style={styles.friendEmail}>{item.user.email}</Text>
+          <Text style={styles.friendName}>{item.user?.displayName || 'Unknown User'}</Text>
+          <Text style={styles.friendEmail}>{item.user?.email || ''}</Text>
         </View>
         <TouchableOpacity
           style={styles.actionButton}
@@ -95,17 +102,17 @@ export const FriendsList = () => {
   const renderRequestItem = ({ item }) => (
     <Card style={styles.requestCard}>
       <View style={styles.requestItem}>
-        {item.from.profilePicture ? (
-          <Image source={{ uri: item.from.profilePicture }} style={styles.avatar} />
+        {item.from?.photoURL ? (
+          <Image source={{ uri: item.from.photoURL }} style={styles.avatar} />
         ) : (
           <Avatar.Text
             size={50}
-            label={item.from.username.substring(0, 2).toUpperCase() || '??'}
+            label={getInitials(item.from?.displayName)}
             style={styles.avatarText}
           />
         )}
         <View style={styles.requestInfo}>
-          <Text style={styles.requestName}>{item.from.username || 'Unknown User'}</Text>
+          <Text style={styles.requestName}>{item.from?.displayName || 'Unknown User'}</Text>
           <Text style={styles.requestText}>sent you a friend request</Text>
         </View>
       </View>
@@ -129,26 +136,26 @@ export const FriendsList = () => {
   const renderSearchResultItem = ({ item }) => (
     <TouchableOpacity
       style={styles.searchResultItem}
-      onPress={() => handleSendRequest(item.id)}
+      onPress={() => handleSendRequest(item.uid)}
     >
-      {item.profilePicture ? (
-        <Image source={{ uri: item.profilePicture }} style={styles.searchAvatar} />
+      {item?.photoURL ? (
+        <Image source={{ uri: item.photoURL }} style={styles.searchAvatar} />
       ) : (
         <Avatar.Text
           size={40}
-          label={item.username.substring(0, 2).toUpperCase()}
+          label={getInitials(item?.displayName)}
           style={styles.avatarText}
         />
       )}
       <View style={styles.searchResultInfo}>
-        <Text style={styles.searchResultName}>{item.username}</Text>
-        <Text style={styles.searchResultEmail}>{item.email}</Text>
+        <Text style={styles.searchResultName}>{item?.displayName || 'Unknown User'}</Text>
+        <Text style={styles.searchResultEmail}>{item?.email || ''}</Text>
       </View>
       <IconButton
         icon="account-plus"
         color={theme.colors.primary}
         size={24}
-        onPress={() => handleSendRequest(item.id)}
+        onPress={() => handleSendRequest(item.uid)}
       />
     </TouchableOpacity>
   );
@@ -254,7 +261,7 @@ export const FriendsList = () => {
               <FlatList
                 data={searchResults}
                 renderItem={renderSearchResultItem}
-                keyExtractor={(item) => item.id}
+                keyExtractor={(item) => item.uid}
                 contentContainerStyle={styles.searchResultsList}
               />
             ) : (
@@ -285,6 +292,7 @@ export const FriendsList = () => {
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
     paddingHorizontal: 16,
   },
   section: {

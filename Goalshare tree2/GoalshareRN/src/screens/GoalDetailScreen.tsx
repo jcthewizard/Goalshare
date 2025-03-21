@@ -281,7 +281,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
 
     return (
       <Animated.View style={animatedStyle}>
-        {children}
+        {typeof children === 'string' ? <Text>{children}</Text> : children}
       </Animated.View>
     );
   };

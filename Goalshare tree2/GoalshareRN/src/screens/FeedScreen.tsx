@@ -1,3 +1,4 @@
+/* eslint-disable */
 // @ts-nocheck
 import React, { useState, useEffect, useRef } from 'react';
 import {
@@ -77,7 +78,7 @@ const FeedScreen = () => {
     const post = feedUpdates.find(update => update.id === postId);
     if (!post || !user) return;
 
-    if (post.likes.includes(user.id)) {
+    if (post.likes.includes(user.uid)) {
       unlikeFeedItem(postId);
     } else {
       likeFeedItem(postId);
@@ -98,7 +99,7 @@ const FeedScreen = () => {
   };
 
   const renderItem = ({ item, index }) => {
-    const isLiked = user ? item.likes.includes(user.id) : false;
+    const isLiked = user ? item.likes.includes(user.uid) : false;
     const hasComments = item.comments && item.comments.length > 0;
 
     // Get animations for this item
@@ -124,7 +125,7 @@ const FeedScreen = () => {
                 }}
               />
               <View style={styles.userTextContainer}>
-                <Text style={styles.username}>{item.username}</Text>
+                <Text style={styles.username}>{item.displayName}</Text>
                 <Text style={styles.timestamp}>
                   {formatDistanceToNow(new Date(item.timestamp))} ago
                 </Text>
@@ -202,7 +203,7 @@ const FeedScreen = () => {
               {item.comments.slice(0, 2).map(comment => (
                 <View key={comment.id} style={styles.commentItem}>
                   <Text style={styles.commentUsername}>
-                    {comment.username}
+                    {comment.displayName}
                   </Text>
                   <Text style={styles.commentText}>{comment.text}</Text>
                   <Text style={styles.commentTimestamp}>
@@ -256,7 +257,7 @@ const FeedScreen = () => {
               renderItem={({ item }) => (
                 <View style={styles.modalCommentItem}>
                   <View style={styles.modalCommentHeader}>
-                    <Text style={styles.modalCommentUsername}>{item.username}</Text>
+                    <Text style={styles.modalCommentUsername}>{item.displayName}</Text>
                     <Text style={styles.modalCommentTimestamp}>
                       {formatDistanceToNow(new Date(item.timestamp))} ago
                     </Text>
