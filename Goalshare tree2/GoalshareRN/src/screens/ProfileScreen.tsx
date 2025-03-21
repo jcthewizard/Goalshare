@@ -457,7 +457,8 @@ const styles = StyleSheet.create({
     color: '#FF5F5F',
   },
   friendsContainer: {
-    padding: 20,
+    flex: 1,
+    padding: 0,
   },
 });
 

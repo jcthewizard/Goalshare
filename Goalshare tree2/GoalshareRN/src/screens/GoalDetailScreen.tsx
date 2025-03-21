@@ -273,9 +273,15 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
 
   // Fix for the Animated.multiply issue
   const AnimatedMultiplyFix = ({ value, multiplier, children }) => {
+    // Create the multiplied value safely
+    const multValue = Animated.multiply(
+      value,
+      new Animated.Value(multiplier || 0)
+    );
+
     const animatedStyle = {
       transform: [{
-        translateY: Animated.multiply(value, new Animated.Value(multiplier))
+        translateY: multValue
       }]
     };
 
