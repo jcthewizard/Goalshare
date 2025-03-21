@@ -26,6 +26,7 @@ import DraggableFlatList from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const SCROLL_THRESHOLD = 400; // The scroll distance where opacity transition completes
 
 type Props = StackScreenProps<RootStackParamList, 'GoalDetail'>;
 
@@ -148,6 +149,19 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
     }
   }, [goal]);
 
+  // Calculate section opacities based on scroll position
+  const stepsOpacity = scrollY.interpolate({
+    inputRange: [0, SCROLL_THRESHOLD],
+    outputRange: [1, 0.2],
+    extrapolate: 'clamp'
+  });
+
+  const timelineOpacity = scrollY.interpolate({
+    inputRange: [0, SCROLL_THRESHOLD],
+    outputRange: [0.4, 1],
+    extrapolate: 'clamp'
+  });
+
   const handleCompleteMilestone = (milestoneId: string, isCompleted: boolean): void => {
     if (!goal) return;
 
@@ -224,13 +238,14 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
               imageUri: milestone.imageUri
             });
 
-            // REMOVE OR COMMENT OUT THIS ALERT BLOCK
+            // REMOVE ALERT - This removes the popup
             // Alert.alert(
-            //   "Milestone Completed!",
-            //   "Your progress has been shared with your friends.",
-            //   [{ text: "Great!" }],
-            //   { cancelable: true }
+            //  "Milestone Completed!",
+            //  "Your progress has been shared with your friends.",
+            //  [{ text: "Great!" }],
+            //  { cancelable: true }
             // );
+
           } catch (error) {
             console.error("Failed to share update:", error);
           }
@@ -312,7 +327,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
         showsVerticalScrollIndicator={false}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: true }
+          { useNativeDriver: false }
         )}
         scrollEventThrottle={16}
       >
@@ -356,7 +371,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
 
         {/* Steps to Complete Section */}
         <Animated.View style={{
-          opacity: fadeAnim,
+          opacity: stepsOpacity,
           transform: [{ translateY: cardTranslateY }],
           width: '100%'
         }}>
@@ -470,7 +485,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
 
         {/* Timeline Section */}
         <Animated.View style={{
-          opacity: fadeAnim,
+          opacity: timelineOpacity,
           transform: [{ translateY: cardTranslateY }]
         }}>
           <View style={styles.timelineSection}>
@@ -548,23 +563,6 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                     </Animated.View>
                   );
                 })}
-
-                {/* Add new milestone button in timeline */}
-                <View style={styles.timelineItem}>
-                  <View style={styles.addMilestoneNodePlaceholder}></View>
-                  <TouchableOpacity
-                    style={styles.addMilestoneCard}
-                    onPress={() => navigation.navigate('AddMilestone', { goalId: goal.id })}
-                  >
-                    <LinearGradient
-                      colors={['rgba(0,0,0,0.03)', 'rgba(0,0,0,0.05)']}
-                      style={styles.addMilestoneGradient}
-                    >
-                      <Text style={styles.addMilestoneText}>Add New Step</Text>
-                      <FontAwesome5 name="plus-circle" size={16} color={theme.colors.primary} />
-                    </LinearGradient>
-                  </TouchableOpacity>
-                </View>
               </View>
             )}
           </View>
@@ -735,7 +733,7 @@ const styles = StyleSheet.create({
   imageContainer: {
     borderRadius: 12,
     overflow: 'hidden',
-    marginTop: 10,
+    marginTop: 5,
   },
   milestoneImage: {
     width: '100%',
@@ -778,13 +776,12 @@ const styles = StyleSheet.create({
     paddingTop: 25,
   },
   stepCard: {
-    marginTop: -10,
-    marginBottom: 15,
+    marginTop: 0,
     borderRadius: 10,
     width: '105%',
     alignSelf: 'center',
     paddingHorizontal: 10,
-    paddingVertical: 20,
+    paddingVertical: 5,
   },
   stepCardActive: {
     elevation: 8,
@@ -814,7 +811,7 @@ const styles = StyleSheet.create({
     marginVertical: 0,
   },
   stepDescription: {
-    marginBottom: 8,
+    marginBottom: 4,
     color: '#666',
     paddingLeft: 24,
     lineHeight: 18,
@@ -899,8 +896,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   stepCardContent: {
-    padding: 12,
-    paddingVertical: 10,
+    padding: 8,
+    paddingVertical: 6,
   },
   fullWidth: {
     width: '100%',
@@ -908,7 +905,8 @@ const styles = StyleSheet.create({
   draggableListContent: {
     width: '100%',
     paddingHorizontal: 6,
-    paddingTop: 6,
+    paddingTop: 3,
+    paddingBottom: 0,
   },
 });
 
