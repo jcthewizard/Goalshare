@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -16,17 +16,21 @@ import {
   Button,
   Card,
   Divider,
-  useTheme
+  useTheme,
+  Tabs,
+  Tab
 } from 'react-native-paper';
 import { useAuth } from '../contexts/AuthContext';
 import { useGoals } from '../contexts/GoalContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome5 } from '@expo/vector-icons';
+import { FriendsList } from '../components/FriendsList';
 
 const ProfileScreen = () => {
   const { user, logout } = useAuth();
   const { goalState } = useGoals();
   const theme = useTheme();
+  const [activeTab, setActiveTab] = useState('stats');
 
   const completedGoals = goalState.goals.filter(goal => goal.completed).length;
   const totalMilestones = goalState.goals.reduce((sum, goal) => sum + goal.milestones.length, 0);
@@ -81,95 +85,135 @@ const ProfileScreen = () => {
           </View>
         </LinearGradient>
 
-        {/* Stats Section */}
-        <View style={styles.statsSection}>
-          <Text style={styles.sectionTitle}>Your Progress</Text>
+        {/* Content Tabs */}
+        <View style={styles.tabsContainer}>
+          <View style={styles.tabs}>
+            <TouchableOpacity
+              style={[
+                styles.tab,
+                activeTab === 'stats' && styles.activeTab
+              ]}
+              onPress={() => setActiveTab('stats')}
+            >
+              <Text style={[
+                styles.tabText,
+                activeTab === 'stats' && styles.activeTabText
+              ]}>
+                Stats
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.tab,
+                activeTab === 'friends' && styles.activeTab
+              ]}
+              onPress={() => setActiveTab('friends')}
+            >
+              <Text style={[
+                styles.tabText,
+                activeTab === 'friends' && styles.activeTabText
+              ]}>
+                Friends
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
-          {/* Stats Cards */}
-          <View style={styles.statsCards}>
-            {/* Goals Card */}
-            <Card style={styles.statsCard}>
-              <LinearGradient
-                colors={['#35CAFC', '#70D6FF']}
-                style={styles.statsCardContent}
-              >
-                <View style={styles.statsIconContainer}>
-                  <FontAwesome5 name="flag" size={22} color="#FFF" />
-                </View>
-                <Text style={styles.statsNumber}>{goalState.goals.length}</Text>
-                <Text style={styles.statsLabel}>Total Goals</Text>
-              </LinearGradient>
-            </Card>
+        {/* Tab Content */}
+        {activeTab === 'stats' ? (
+          /* Stats Section */
+          <View style={styles.statsSection}>
+            <Text style={styles.sectionTitle}>Your Progress</Text>
 
-            {/* Completed Goals Card */}
-            <Card style={styles.statsCard}>
-              <LinearGradient
-                colors={['#4CD964', '#7CEC9F']}
-                style={styles.statsCardContent}
-              >
-                <View style={styles.statsIconContainer}>
-                  <FontAwesome5 name="check-circle" size={22} color="#FFF" />
+            {/* Stats Cards */}
+            <View style={styles.statsCards}>
+              {/* Goals Card */}
+              <Card style={styles.statsCard}>
+                <LinearGradient
+                  colors={['#35CAFC', '#70D6FF']}
+                  style={styles.statsCardContent}
+                >
+                  <View style={styles.statsIconContainer}>
+                    <FontAwesome5 name="flag" size={22} color="#FFF" />
+                  </View>
+                  <Text style={styles.statsNumber}>{goalState.goals.length}</Text>
+                  <Text style={styles.statsLabel}>Total Goals</Text>
+                </LinearGradient>
+              </Card>
+
+              {/* Completed Goals Card */}
+              <Card style={styles.statsCard}>
+                <LinearGradient
+                  colors={['#4CD964', '#7CEC9F']}
+                  style={styles.statsCardContent}
+                >
+                  <View style={styles.statsIconContainer}>
+                    <FontAwesome5 name="check-circle" size={22} color="#FFF" />
+                  </View>
+                  <Text style={styles.statsNumber}>{completedGoals}</Text>
+                  <Text style={styles.statsLabel}>Completed</Text>
+                </LinearGradient>
+              </Card>
+            </View>
+
+            {/* Completion Rates */}
+            <Card style={styles.completionCard}>
+              <Card.Content>
+                <View style={styles.completionHeader}>
+                  <Text style={styles.completionTitle}>Completion Rates</Text>
                 </View>
-                <Text style={styles.statsNumber}>{completedGoals}</Text>
-                <Text style={styles.statsLabel}>Completed</Text>
-              </LinearGradient>
+
+                {/* Goals Completion */}
+                <View style={styles.completionSection}>
+                  <View style={styles.completionLabelRow}>
+                    <Text style={styles.completionLabel}>Goals</Text>
+                    <Text style={styles.completionPercent}>{goalCompletionRate}%</Text>
+                  </View>
+                  <View style={styles.progressBarContainer}>
+                    <View
+                      style={[
+                        styles.progressBar,
+                        { width: `${goalCompletionRate}%`, backgroundColor: theme.colors.primary }
+                      ]}
+                    />
+                  </View>
+                </View>
+
+                {/* Milestones Completion */}
+                <View style={styles.completionSection}>
+                  <View style={styles.completionLabelRow}>
+                    <Text style={styles.completionLabel}>Milestones</Text>
+                    <Text style={styles.completionPercent}>{milestoneCompletionRate}%</Text>
+                  </View>
+                  <View style={styles.progressBarContainer}>
+                    <View
+                      style={[
+                        styles.progressBar,
+                        { width: `${milestoneCompletionRate}%`, backgroundColor: theme.colors.accent }
+                      ]}
+                    />
+                  </View>
+                </View>
+
+                {/* Total Stats */}
+                <View style={styles.totalStatsContainer}>
+                  <View style={styles.totalStatItem}>
+                    <Text style={styles.totalStatLabel}>Total Milestones</Text>
+                    <Text style={styles.totalStatValue}>{totalMilestones}</Text>
+                  </View>
+                  <View style={styles.totalStatDivider} />
+                  <View style={styles.totalStatItem}>
+                    <Text style={styles.totalStatLabel}>Completed</Text>
+                    <Text style={styles.totalStatValue}>{completedMilestones}</Text>
+                  </View>
+                </View>
+              </Card.Content>
             </Card>
           </View>
-
-          {/* Completion Rates */}
-          <Card style={styles.completionCard}>
-            <Card.Content>
-              <View style={styles.completionHeader}>
-                <Text style={styles.completionTitle}>Completion Rates</Text>
-              </View>
-
-              {/* Goals Completion */}
-              <View style={styles.completionSection}>
-                <View style={styles.completionLabelRow}>
-                  <Text style={styles.completionLabel}>Goals</Text>
-                  <Text style={styles.completionPercent}>{goalCompletionRate}%</Text>
-                </View>
-                <View style={styles.progressBarContainer}>
-                  <View
-                    style={[
-                      styles.progressBar,
-                      { width: `${goalCompletionRate}%`, backgroundColor: theme.colors.primary }
-                    ]}
-                  />
-                </View>
-              </View>
-
-              {/* Milestones Completion */}
-              <View style={styles.completionSection}>
-                <View style={styles.completionLabelRow}>
-                  <Text style={styles.completionLabel}>Milestones</Text>
-                  <Text style={styles.completionPercent}>{milestoneCompletionRate}%</Text>
-                </View>
-                <View style={styles.progressBarContainer}>
-                  <View
-                    style={[
-                      styles.progressBar,
-                      { width: `${milestoneCompletionRate}%`, backgroundColor: theme.colors.accent }
-                    ]}
-                  />
-                </View>
-              </View>
-
-              {/* Total Stats */}
-              <View style={styles.totalStatsContainer}>
-                <View style={styles.totalStatItem}>
-                  <Text style={styles.totalStatLabel}>Total Milestones</Text>
-                  <Text style={styles.totalStatValue}>{totalMilestones}</Text>
-                </View>
-                <View style={styles.totalStatDivider} />
-                <View style={styles.totalStatItem}>
-                  <Text style={styles.totalStatLabel}>Completed</Text>
-                  <Text style={styles.totalStatValue}>{completedMilestones}</Text>
-                </View>
-              </View>
-            </Card.Content>
-          </Card>
-        </View>
+        ) : (
+          /* Friends Section */
+          <FriendsList />
+        )}
 
         {/* Logout Button */}
         <TouchableOpacity
@@ -231,6 +275,39 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: 'rgba(255, 255, 255, 0.8)',
   },
+  tabsContainer: {
+    paddingHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  tabs: {
+    flexDirection: 'row',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 25,
+    padding: 4,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 25,
+  },
+  activeTab: {
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  tabText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#888',
+  },
+  activeTabText: {
+    color: '#FF5F5F',
+  },
   statsSection: {
     padding: 20,
   },
@@ -249,52 +326,53 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 6,
     borderRadius: 16,
-    elevation: 2,
+    overflow: 'hidden',
+    elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    overflow: 'hidden',
   },
   statsCardContent: {
     padding: 16,
     alignItems: 'center',
     minHeight: 120,
+    justifyContent: 'center',
   },
   statsIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     alignItems: 'center',
-    marginBottom: 10,
+    justifyContent: 'center',
+    marginBottom: 12,
   },
   statsNumber: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: '700',
     color: 'white',
     marginBottom: 4,
   },
   statsLabel: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   completionCard: {
     borderRadius: 16,
     elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 2,
   },
   completionHeader: {
     marginBottom: 16,
   },
   completionTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: '700',
+    color: '#555',
   },
   completionSection: {
     marginBottom: 16,
@@ -302,64 +380,66 @@ const styles = StyleSheet.create({
   completionLabelRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   completionLabel: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#666',
   },
   completionPercent: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#333',
+    color: '#555',
   },
   progressBarContainer: {
-    height: 10,
-    backgroundColor: '#F0F0F0',
-    borderRadius: 5,
+    height: 8,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 4,
     overflow: 'hidden',
   },
   progressBar: {
     height: '100%',
-    borderRadius: 5,
+    borderRadius: 4,
   },
   totalStatsContainer: {
     flexDirection: 'row',
-    marginTop: 24,
-    paddingTop: 16,
+    marginTop: 20,
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+    borderTopColor: '#EEEEEE',
+    paddingTop: 16,
   },
   totalStatItem: {
     flex: 1,
     alignItems: 'center',
   },
-  totalStatDivider: {
-    width: 1,
-    backgroundColor: '#F0F0F0',
-  },
   totalStatLabel: {
     fontSize: 14,
-    color: '#666',
+    color: '#888',
     marginBottom: 4,
   },
   totalStatValue: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700',
-    color: '#333',
+    color: '#555',
+  },
+  totalStatDivider: {
+    width: 1,
+    backgroundColor: '#EEEEEE',
   },
   logoutButton: {
-    backgroundColor: '#F0F0F0',
-    paddingVertical: 12,
-    borderRadius: 30,
+    backgroundColor: '#f8f8f8',
+    borderRadius: 25,
+    paddingVertical: 14,
     marginHorizontal: 20,
-    marginTop: 30,
+    marginTop: 20,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#EEEEEE',
   },
   logoutButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FF3B30',
+    color: '#FF5F5F',
   },
 });
 

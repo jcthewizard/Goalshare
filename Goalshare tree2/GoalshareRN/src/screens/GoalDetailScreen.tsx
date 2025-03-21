@@ -10,10 +10,13 @@ import {
   SafeAreaView,
   Animated,
   Dimensions,
-  Easing
+  Easing,
+  Alert
 } from 'react-native';
 import { Card, Title, Paragraph, Checkbox, useTheme, IconButton } from 'react-native-paper';
 import { useGoals } from '../contexts/GoalContext';
+import { useSocial } from '../contexts/SocialContext';
+import { useAuth } from '../contexts/AuthContext';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation';
 import { format } from 'date-fns';
@@ -29,6 +32,7 @@ type Props = StackScreenProps<RootStackParamList, 'GoalDetail'>;
 const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.ReactElement => {
   const { goalId } = route.params;
   const { goalState, fetchGoals, completeMilestone } = useGoals();
+  const { user } = useAuth();
   const [goal, setGoal] = useState(goalState.goals.find((g) => g.id === goalId) || null);
   const [animatedValues, setAnimatedValues] = useState<{[key: string]: Animated.Value}>({});
   const theme = useTheme();
@@ -131,6 +135,9 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
   const stepScale = useRef(new Animated.Value(1)).current;
   const stepOpacity = useRef(new Animated.Value(1)).current;
 
+  // Get social context for sharing
+  const { addMilestoneCompletionUpdate } = useSocial();
+
   // Update steps when goal changes
   useEffect(() => {
     if (goal) {
@@ -149,32 +156,48 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
       const step = stepsToComplete.find(s => s.id === milestoneId);
       setStepBeingCompleted(step);
 
+      // Get the position of the timeline section for animation target
+      const timelineSectionY = 300; // Default value, adjust based on layout
+
       // Animate the step moving to timeline
       Animated.sequence([
-        // Scale up slightly
+        // Initial feedback - pulse effect
         Animated.timing(stepScale, {
-          toValue: 1.05,
-          duration: 150,
+          toValue: 1.1,
+          duration: 200,
           useNativeDriver: true,
+          easing: Easing.out(Easing.cubic),
         }),
-        // Move down to timeline
+        // Move to timeline with a nice arc motion
         Animated.parallel([
+          // Move down to timeline
           Animated.timing(stepTranslateY, {
-            toValue: 200, // Adjust based on your layout
-            duration: 400,
+            toValue: timelineSectionY,
+            duration: 600,
             useNativeDriver: true,
-            easing: Easing.out(Easing.cubic),
+            easing: Easing.bezier(0.25, 0.1, 0.25, 1),
           }),
+          // Move slightly to the side for arc effect
+          Animated.timing(stepTranslateX, {
+            toValue: -30,
+            duration: 600,
+            useNativeDriver: true,
+            easing: Easing.bezier(0.42, 0, 0.58, 1),
+          }),
+          // Scale down slightly as it moves
           Animated.timing(stepScale, {
-            toValue: 0.9,
-            duration: 400,
+            toValue: 0.8,
+            duration: 600,
             useNativeDriver: true,
+            easing: Easing.bezier(0.42, 0, 0.58, 1),
           }),
+          // Fade out gently at the end
           Animated.timing(stepOpacity, {
             toValue: 0,
-            duration: 300,
-            delay: 300,
+            duration: 400,
+            delay: 350, // Start fading after movement has begun
             useNativeDriver: true,
+            easing: Easing.bezier(0.42, 0, 0.58, 1),
           }),
         ]),
       ]).start(() => {
@@ -187,6 +210,31 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
 
         // Actually update the milestone state
         completeMilestone(goal.id, milestoneId, true);
+
+        // Add to feed as a social update
+        const milestone = goal.milestones.find(m => m.id === milestoneId);
+        if (milestone && user) {
+          try {
+            addMilestoneCompletionUpdate({
+              goalId: goal.id,
+              goalTitle: goal.title,
+              milestoneId: milestone.id,
+              milestoneTitle: milestone.title,
+              milestoneDescription: milestone.description,
+              imageUri: milestone.imageUri
+            });
+
+            // Show success toast or feedback
+            Alert.alert(
+              "Milestone Completed!",
+              "Your progress has been shared with your friends.",
+              [{ text: "Great!" }],
+              { cancelable: true }
+            );
+          } catch (error) {
+            console.error("Failed to share update:", error);
+          }
+        }
       });
     } else {
       // Simply uncomplete the milestone
@@ -332,11 +380,13 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                     data={stepsToComplete}
                     keyExtractor={item => item.id}
                     onDragEnd={handleDragEnd}
+                    contentContainerStyle={styles.draggableListContent}
                     renderItem={({ item, drag, isActive }) => {
                       const isBeingCompleted = stepBeingCompleted?.id === item.id;
 
                       return (
                         <Animated.View style={[
+                          styles.fullWidth,
                           isBeingCompleted ? {
                             zIndex: 1000,
                             opacity: stepOpacity,
@@ -356,10 +406,12 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                             ]}
                             disabled={isBeingCompleted}
                           >
-                            <Card>
-                              <Card.Content>
+                            <Card style={styles.fullWidth} elevation={isActive ? 4 : 2}>
+                              <Card.Content style={styles.stepCardContent}>
                                 <View style={styles.stepHeader}>
-                                  <FontAwesome5 name="grip-lines" size={14} color="#aaa" style={styles.dragHandle} />
+                                  <View style={styles.dragHandle}>
+                                    <FontAwesome5 name="grip-lines" size={14} color="#aaa" />
+                                  </View>
                                   <Title style={styles.stepTitle}>{item.title}</Title>
                                   <TouchableOpacity
                                     style={styles.checkboxContainer}
@@ -662,6 +714,8 @@ const styles = StyleSheet.create({
     borderColor: '#35CAFC',
     justifyContent: 'center',
     alignItems: 'center',
+    marginLeft: 8,
+    alignSelf: 'center',
   },
   checkboxCompleted: {
     backgroundColor: '#4CD964',
@@ -706,7 +760,8 @@ const styles = StyleSheet.create({
   },
   stepsSection: {
     marginBottom: 30,
-    paddingHorizontal: 8,
+    paddingHorizontal: 0,
+    paddingTop: 10,
   },
   timelineSection: {
     marginBottom: 20,
@@ -717,6 +772,8 @@ const styles = StyleSheet.create({
   stepCard: {
     marginBottom: 16,
     borderRadius: 12,
+    width: '100%',
+    paddingHorizontal: 8,
   },
   stepCardActive: {
     elevation: 8,
@@ -731,19 +788,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 8,
+    height: 40,
+    paddingVertical: 4,
   },
   stepTitle: {
     flex: 1,
     fontSize: 18,
-    marginLeft: 10,
+    marginLeft: 8,
+    alignSelf: 'center',
   },
   stepDescription: {
     marginBottom: 8,
     color: '#666',
     paddingLeft: 24,
+    lineHeight: 20,
   },
   dragHandle: {
-    padding: 4,
+    width: 28,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyStateText: {
     textAlign: 'center',
@@ -767,7 +831,9 @@ const styles = StyleSheet.create({
   },
   stepsListContainer: {
     position: 'relative',
-    paddingBottom: 80, // Make room for the FAB
+    paddingBottom: 80,
+    marginTop: 10,
+    width: '100%',
   },
   addStepButton: {
     marginTop: 20,
@@ -813,6 +879,17 @@ const styles = StyleSheet.create({
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  stepCardContent: {
+    padding: 16,
+    paddingVertical: 12,
+  },
+  fullWidth: {
+    width: '100%',
+  },
+  draggableListContent: {
+    width: '100%',
+    paddingHorizontal: 16,
   },
 });
 

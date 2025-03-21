@@ -38,3 +38,46 @@ export type GoalState = {
   loading: boolean;
   error: string | null;
 };
+
+// Social features types
+export type FriendRequestStatus = 'pending' | 'accepted' | 'declined';
+
+export type FriendRequest = {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  status: FriendRequestStatus;
+  createdAt: Date;
+};
+
+export type Comment = {
+  id: string;
+  userId: string;
+  text: string;
+  timestamp: number;
+  user: User;
+};
+
+export type MilestoneUpdate = {
+  id: string;
+  userId: string;
+  goalId: string;
+  goalTitle: string;
+  milestoneId: string;
+  milestoneTitle: string;
+  milestoneDescription?: string;
+  imageUri?: string;
+  completed: boolean;
+  timestamp: number;
+  likes: string[]; // Array of user IDs
+  comments: Comment[];
+  user: User;
+};
+
+export type SocialState = {
+  friends: User[];
+  friendRequests: FriendRequest[];
+  feed: MilestoneUpdate[];
+  loading: boolean;
+  error: string | null;
+};
