@@ -224,13 +224,13 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
               imageUri: milestone.imageUri
             });
 
-            // Show success toast or feedback
-            Alert.alert(
-              "Milestone Completed!",
-              "Your progress has been shared with your friends.",
-              [{ text: "Great!" }],
-              { cancelable: true }
-            );
+            // REMOVE OR COMMENT OUT THIS ALERT BLOCK
+            // Alert.alert(
+            //   "Milestone Completed!",
+            //   "Your progress has been shared with your friends.",
+            //   [{ text: "Great!" }],
+            //   { cancelable: true }
+            // );
           } catch (error) {
             console.error("Failed to share update:", error);
           }
@@ -357,7 +357,8 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
         {/* Steps to Complete Section */}
         <Animated.View style={{
           opacity: fadeAnim,
-          transform: [{ translateY: cardTranslateY }]
+          transform: [{ translateY: cardTranslateY }],
+          width: '100%'
         }}>
           <View style={styles.stepsSection}>
             <Text style={styles.sectionTitle}>Steps to Complete</Text>
@@ -380,7 +381,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                 </TouchableOpacity>
               </View>
             ) : (
-              <GestureHandlerRootView style={{ flex: 1 }}>
+              <GestureHandlerRootView style={{ flex: 1, width: '100%' }}>
                 <View style={styles.stepsListContainer}>
                   <DraggableFlatList
                     data={stepsToComplete}
@@ -661,11 +662,11 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   timelineContainer: {
-    marginLeft: 12,
+    marginLeft: 8,
   },
   timelineItem: {
     flexDirection: 'row',
-    marginBottom: 24,
+    marginBottom: 20,
     position: 'relative',
   },
   timelineConnector: {
@@ -713,14 +714,14 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   checkboxContainer: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     borderWidth: 2,
     borderColor: '#35CAFC',
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 8,
+    marginLeft: 6,
     alignSelf: 'center',
   },
   checkboxCompleted: {
@@ -765,9 +766,10 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   stepsSection: {
-    marginBottom: 30,
+    marginBottom: 0,
     paddingHorizontal: 0,
-    paddingTop: 10,
+    width: '100%',
+    alignSelf: 'center',
   },
   timelineSection: {
     marginBottom: 20,
@@ -776,10 +778,13 @@ const styles = StyleSheet.create({
     paddingTop: 25,
   },
   stepCard: {
-    marginBottom: 16,
-    borderRadius: 12,
-    width: '100%',
-    paddingHorizontal: 8,
+    marginTop: -10,
+    marginBottom: 15,
+    borderRadius: 10,
+    width: '105%',
+    alignSelf: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 20,
   },
   stepCardActive: {
     elevation: 8,
@@ -793,25 +798,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
-    height: 40,
-    paddingVertical: 4,
+    marginBottom: 0,
+    height: 30,
+    paddingVertical: 2,
   },
   stepTitle: {
     flex: 1,
-    fontSize: 18,
+    fontSize: 16,
     marginLeft: 8,
     alignSelf: 'center',
+    textAlignVertical: 'center',
+    textAlign: 'left',
+    lineHeight: 20,
+    paddingVertical: 0,
+    marginVertical: 0,
   },
   stepDescription: {
     marginBottom: 8,
     color: '#666',
     paddingLeft: 24,
-    lineHeight: 20,
+    lineHeight: 18,
+    fontSize: 14,
   },
   dragHandle: {
-    width: 28,
-    height: 40,
+    width: 24,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -838,11 +849,12 @@ const styles = StyleSheet.create({
   stepsListContainer: {
     position: 'relative',
     paddingBottom: 80,
-    marginTop: 10,
+    marginTop: -10,
     width: '100%',
   },
   addStepButton: {
     marginTop: 20,
+    marginBottom: 20,
     borderRadius: 12,
     overflow: 'hidden',
     alignSelf: 'center',
@@ -887,15 +899,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   stepCardContent: {
-    padding: 16,
-    paddingVertical: 12,
+    padding: 12,
+    paddingVertical: 10,
   },
   fullWidth: {
     width: '100%',
   },
   draggableListContent: {
     width: '100%',
-    paddingHorizontal: 16,
+    paddingHorizontal: 6,
+    paddingTop: 6,
   },
 });
 
