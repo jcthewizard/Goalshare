@@ -19,6 +19,8 @@ import { RootStackParamList } from '../navigation';
 import { format } from 'date-fns';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome5 } from '@expo/vector-icons';
+import DraggableFlatList from 'react-native-draggable-flatlist';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -33,6 +35,51 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
   const scrollY = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const cardTranslateY = useRef(new Animated.Value(50)).current;
+
+  // Create refs for milestone animations - moved outside the render
+  const milestoneAnimRefs = useRef({});
+
+  // Pre-create all the animation values for each milestone
+  useEffect(() => {
+    if (goal && goal.milestones) {
+      // Initialize animation refs for all milestones
+      const milestonesAnimations = {};
+      goal.milestones.forEach((milestone, index) => {
+        if (!milestoneAnimRefs.current[milestone.id]) {
+          milestonesAnimations[milestone.id] = {
+            fade: new Animated.Value(0),
+            translateY: new Animated.Value(50)
+          };
+        }
+      });
+      milestoneAnimRefs.current = {...milestoneAnimRefs.current, ...milestonesAnimations};
+
+      // Start the animations
+      goal.milestones.forEach((milestone, index) => {
+        const delay = 300 + (index * 100);
+        const animations = milestoneAnimRefs.current[milestone.id];
+
+        if (animations) {
+          Animated.parallel([
+            Animated.timing(animations.fade, {
+              toValue: 1,
+              duration: 500,
+              delay,
+              useNativeDriver: true,
+              easing: Easing.out(Easing.cubic),
+            }),
+            Animated.timing(animations.translateY, {
+              toValue: 0,
+              duration: 700,
+              delay,
+              useNativeDriver: true,
+              easing: Easing.out(Easing.cubic),
+            }),
+          ]).start();
+        }
+      });
+    }
+  }, [goal?.milestones]);
 
   // Use this effect only once to fetch goals if needed
   useEffect(() => {
@@ -76,17 +123,83 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
     ]).start();
   }, []);
 
+  const [stepsToComplete, setStepsToComplete] = useState([]);
+  const [completedSteps, setCompletedSteps] = useState([]);
+  const [stepBeingCompleted, setStepBeingCompleted] = useState(null);
+  const stepTranslateY = useRef(new Animated.Value(0)).current;
+  const stepTranslateX = useRef(new Animated.Value(0)).current;
+  const stepScale = useRef(new Animated.Value(1)).current;
+  const stepOpacity = useRef(new Animated.Value(1)).current;
+
+  // Update steps when goal changes
+  useEffect(() => {
+    if (goal) {
+      const incomplete = goal.milestones.filter(m => !m.completed);
+      const completed = goal.milestones.filter(m => m.completed);
+      setStepsToComplete(incomplete);
+      setCompletedSteps(completed);
+    }
+  }, [goal]);
+
   const handleCompleteMilestone = (milestoneId: string, isCompleted: boolean): void => {
     if (!goal) return;
 
-    // Animate the completion status change
-    Animated.timing(animatedValues[milestoneId], {
-      toValue: !isCompleted ? 1 : 0,
-      duration: 300,
-      useNativeDriver: false,
-    }).start();
+    if (!isCompleted) {
+      // Find the step being completed
+      const step = stepsToComplete.find(s => s.id === milestoneId);
+      setStepBeingCompleted(step);
 
-    completeMilestone(goal.id, milestoneId, !isCompleted);
+      // Animate the step moving to timeline
+      Animated.sequence([
+        // Scale up slightly
+        Animated.timing(stepScale, {
+          toValue: 1.05,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        // Move down to timeline
+        Animated.parallel([
+          Animated.timing(stepTranslateY, {
+            toValue: 200, // Adjust based on your layout
+            duration: 400,
+            useNativeDriver: true,
+            easing: Easing.out(Easing.cubic),
+          }),
+          Animated.timing(stepScale, {
+            toValue: 0.9,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+          Animated.timing(stepOpacity, {
+            toValue: 0,
+            duration: 300,
+            delay: 300,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]).start(() => {
+        // Reset animation values
+        stepTranslateY.setValue(0);
+        stepTranslateX.setValue(0);
+        stepScale.setValue(1);
+        stepOpacity.setValue(1);
+        setStepBeingCompleted(null);
+
+        // Actually update the milestone state
+        completeMilestone(goal.id, milestoneId, true);
+      });
+    } else {
+      // Simply uncomplete the milestone
+      completeMilestone(goal.id, milestoneId, false);
+    }
+  };
+
+  const handleDragEnd = ({ data }) => {
+    // Update the order of steps
+    setStepsToComplete(data);
+
+    // Here you would typically update this order in your backend
+    // For example: updateMilestoneOrder(goal.id, data.map(item => item.id));
   };
 
   if (!goal) {
@@ -109,6 +222,21 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
   const progressPercentage = totalMilestones > 0
     ? Math.round((completedMilestones / totalMilestones) * 100)
     : 0;
+
+  // Fix for the Animated.multiply issue
+  const AnimatedMultiplyFix = ({ value, multiplier, children }) => {
+    const animatedStyle = {
+      transform: [{
+        translateY: Animated.multiply(value, new Animated.Value(multiplier))
+      }]
+    };
+
+    return (
+      <Animated.View style={animatedStyle}>
+        {children}
+      </Animated.View>
+    );
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -172,148 +300,214 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
           </LinearGradient>
         </Animated.View>
 
-        {/* Milestones section */}
+        {/* Steps to Complete Section */}
         <Animated.View style={{
           opacity: fadeAnim,
           transform: [{ translateY: cardTranslateY }]
         }}>
-          <View style={styles.milestonesSection}>
-            <Text style={styles.sectionTitle}>Your Milestones</Text>
-
-            {/* Timeline View of Milestones with Photos */}
-            <View style={styles.timelineContainer}>
-              {sortedMilestones.map((milestone, index) => {
-                // Create a staggered animation delay for each milestone
-                const itemFadeAnim = useRef(new Animated.Value(0)).current;
-                const itemTranslateY = useRef(new Animated.Value(50)).current;
-
-                useEffect(() => {
-                  // Stagger the animation with 100ms delay per item
-                  const delay = 300 + (index * 100);
-
-                  Animated.parallel([
-                    Animated.timing(itemFadeAnim, {
-                      toValue: 1,
-                      duration: 500,
-                      delay,
-                      useNativeDriver: true,
-                      easing: Easing.out(Easing.cubic),
-                    }),
-                    Animated.timing(itemTranslateY, {
-                      toValue: 0,
-                      duration: 700,
-                      delay,
-                      useNativeDriver: true,
-                      easing: Easing.out(Easing.cubic),
-                    }),
-                  ]).start();
-                }, []);
-
-                return (
-                  <Animated.View key={milestone.id}
-                    style={[
-                      styles.timelineItem,
-                      {
-                        opacity: itemFadeAnim,
-                        transform: [{ translateY: itemTranslateY }]
-                      }
-                    ]}
-                  >
-                    {/* Timeline connector */}
-                    {index > 0 && (
-                      <View style={styles.timelineConnector} />
-                    )}
-
-                    {/* Milestone node */}
-                    <Animated.View style={[
-                      styles.timelineNode,
-                      {
-                        backgroundColor: animatedValues[milestone.id]?.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [theme.colors.accent, theme.colors.success]
-                        }) || (milestone.completed ? theme.colors.success : theme.colors.accent),
-                        transform: [{
-                          scale: animatedValues[milestone.id]?.interpolate({
-                            inputRange: [0, 0.5, 1],
-                            outputRange: [1, 1.2, 1]
-                          }) || 1
-                        }]
-                      }
-                    ]}>
-                      {milestone.completed ? (
-                        <FontAwesome5 name="check" size={14} color="#FFF" />
-                      ) : (
-                        <Text style={styles.timelineNodeText}>{index + 1}</Text>
-                      )}
-                    </Animated.View>
-
-                    {/* Milestone content */}
-                    <Card style={styles.milestoneCard}>
-                      <Card.Content>
-                        <View style={styles.milestoneHeader}>
-                          <Title style={styles.milestoneTitle}>{milestone.title}</Title>
-                          <TouchableOpacity
-                            style={[
-                              styles.checkboxContainer,
-                              milestone.completed ? styles.checkboxCompleted : {}
-                            ]}
-                            onPress={() => handleCompleteMilestone(milestone.id, milestone.completed)}
-                          >
-                            {milestone.completed && <FontAwesome5 name="check" size={14} color="#FFF" />}
-                          </TouchableOpacity>
-                        </View>
-
-                        {milestone.description && (
-                          <Paragraph style={styles.milestoneDescription}>
-                            {milestone.description}
-                          </Paragraph>
-                        )}
-
-                        {/* Display milestone image if available */}
-                        {milestone.imageUri && (
-                          <View style={styles.imageContainer}>
-                            <Image
-                              source={{ uri: milestone.imageUri }}
-                              style={styles.milestoneImage}
-                            />
-                          </View>
-                        )}
-                      </Card.Content>
-                    </Card>
-                  </Animated.View>
-                );
-              })}
-
-              {/* Add new milestone button in timeline */}
-              <Animated.View
-                style={[
-                  styles.timelineItem,
-                  {
-                    opacity: fadeAnim,
-                    transform: [{
-                      translateY: Animated.multiply(
-                        cardTranslateY,
-                        new Animated.Value(0.5)
-                      )
-                    }]
-                  }
-                ]}
-              >
-                <View style={styles.addMilestoneNodePlaceholder}></View>
+          <View style={styles.stepsSection}>
+            <Text style={styles.sectionTitle}>Steps to Complete</Text>
+            {stepsToComplete.length === 0 ? (
+              <View>
+                <Text style={styles.emptyStateText}>All steps completed! 🎉</Text>
                 <TouchableOpacity
-                  style={styles.addMilestoneCard}
+                  style={styles.addStepButton}
                   onPress={() => navigation.navigate('AddMilestone', { goalId: goal.id })}
                 >
                   <LinearGradient
-                    colors={['rgba(0,0,0,0.03)', 'rgba(0,0,0,0.05)']}
-                    style={styles.addMilestoneGradient}
+                    colors={['#FF5F5F', '#FF8C8C']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.addStepButtonGradient}
                   >
-                    <Text style={styles.addMilestoneText}>Add New Milestone</Text>
-                    <FontAwesome5 name="plus-circle" size={16} color={theme.colors.primary} />
+                    <Text style={styles.addStepButtonText}>Add New Step</Text>
+                    <FontAwesome5 name="plus" size={16} color="#FFF" />
                   </LinearGradient>
                 </TouchableOpacity>
-              </Animated.View>
-            </View>
+              </View>
+            ) : (
+              <GestureHandlerRootView style={{ flex: 1 }}>
+                <View style={styles.stepsListContainer}>
+                  <DraggableFlatList
+                    data={stepsToComplete}
+                    keyExtractor={item => item.id}
+                    onDragEnd={handleDragEnd}
+                    renderItem={({ item, drag, isActive }) => {
+                      const isBeingCompleted = stepBeingCompleted?.id === item.id;
+
+                      return (
+                        <Animated.View style={[
+                          isBeingCompleted ? {
+                            zIndex: 1000,
+                            opacity: stepOpacity,
+                            transform: [
+                              { translateY: stepTranslateY },
+                              { translateX: stepTranslateX },
+                              { scale: stepScale }
+                            ]
+                          } : null
+                        ]}>
+                          <TouchableOpacity
+                            onLongPress={drag}
+                            delayLongPress={150}
+                            style={[
+                              styles.stepCard,
+                              isActive && styles.stepCardActive
+                            ]}
+                            disabled={isBeingCompleted}
+                          >
+                            <Card>
+                              <Card.Content>
+                                <View style={styles.stepHeader}>
+                                  <FontAwesome5 name="grip-lines" size={14} color="#aaa" style={styles.dragHandle} />
+                                  <Title style={styles.stepTitle}>{item.title}</Title>
+                                  <TouchableOpacity
+                                    style={styles.checkboxContainer}
+                                    onPress={() => handleCompleteMilestone(item.id, item.completed)}
+                                  >
+                                    <FontAwesome5 name="check" size={14} color="transparent" />
+                                  </TouchableOpacity>
+                                </View>
+
+                                {item.description && (
+                                  <Paragraph style={styles.stepDescription}>
+                                    {item.description}
+                                  </Paragraph>
+                                )}
+
+                                {item.imageUri && (
+                                  <View style={styles.imageContainer}>
+                                    <Image
+                                      source={{ uri: item.imageUri }}
+                                      style={styles.stepImage}
+                                    />
+                                  </View>
+                                )}
+                              </Card.Content>
+                            </Card>
+                          </TouchableOpacity>
+                        </Animated.View>
+                      );
+                    }}
+                  />
+                  <TouchableOpacity
+                    style={styles.addStepFAB}
+                    onPress={() => navigation.navigate('AddMilestone', { goalId: goal.id })}
+                  >
+                    <LinearGradient
+                      colors={['#FF5F5F', '#FF8C8C']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.addStepFABGradient}
+                    >
+                      <FontAwesome5 name="plus" size={20} color="#FFF" />
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+              </GestureHandlerRootView>
+            )}
+          </View>
+        </Animated.View>
+
+        {/* Timeline Section */}
+        <Animated.View style={{
+          opacity: fadeAnim,
+          transform: [{ translateY: cardTranslateY }]
+        }}>
+          <View style={styles.timelineSection}>
+            <Text style={styles.sectionTitle}>Timeline</Text>
+
+            {completedSteps.length === 0 ? (
+              <Text style={styles.emptyStateText}>Complete steps to see your progress here</Text>
+            ) : (
+              <View style={styles.timelineContainer}>
+                {completedSteps.map((milestone, index) => {
+                  // Get pre-created animation values for this milestone
+                  const animations = milestoneAnimRefs.current[milestone.id] || {
+                    fade: new Animated.Value(1),
+                    translateY: new Animated.Value(0)
+                  };
+
+                  return (
+                    <Animated.View key={milestone.id}
+                      style={[
+                        styles.timelineItem,
+                        {
+                          opacity: animations.fade,
+                          transform: [{ translateY: animations.translateY }]
+                        }
+                      ]}
+                    >
+                      {/* Timeline connector */}
+                      {index > 0 && (
+                        <View style={styles.timelineConnector} />
+                      )}
+
+                      {/* Milestone node */}
+                      <Animated.View style={[
+                        styles.timelineNode,
+                        { backgroundColor: theme.colors.success }
+                      ]}>
+                        <FontAwesome5 name="check" size={14} color="#FFF" />
+                      </Animated.View>
+
+                      {/* Milestone content */}
+                      <Card style={styles.milestoneCard}>
+                        <Card.Content>
+                          <View style={styles.milestoneHeader}>
+                            <Title style={styles.milestoneTitle}>{milestone.title}</Title>
+                            <TouchableOpacity
+                              style={[styles.checkboxContainer, styles.checkboxCompleted]}
+                              onPress={() => handleCompleteMilestone(milestone.id, milestone.completed)}
+                            >
+                              <FontAwesome5 name="check" size={14} color="#FFF" />
+                            </TouchableOpacity>
+                          </View>
+
+                          {milestone.description && (
+                            <Paragraph style={styles.milestoneDescription}>
+                              {milestone.description}
+                            </Paragraph>
+                          )}
+
+                          {/* Display milestone image if available */}
+                          {milestone.imageUri && (
+                            <View style={styles.imageContainer}>
+                              <Image
+                                source={{ uri: milestone.imageUri }}
+                                style={styles.milestoneImage}
+                              />
+                            </View>
+                          )}
+
+                          {/* Completion date could be added here */}
+                          <Text style={styles.completedDate}>
+                            Completed {format(new Date(), 'MMM d, yyyy')}
+                          </Text>
+                        </Card.Content>
+                      </Card>
+                    </Animated.View>
+                  );
+                })}
+
+                {/* Add new milestone button in timeline */}
+                <View style={styles.timelineItem}>
+                  <View style={styles.addMilestoneNodePlaceholder}></View>
+                  <TouchableOpacity
+                    style={styles.addMilestoneCard}
+                    onPress={() => navigation.navigate('AddMilestone', { goalId: goal.id })}
+                  >
+                    <LinearGradient
+                      colors={['rgba(0,0,0,0.03)', 'rgba(0,0,0,0.05)']}
+                      style={styles.addMilestoneGradient}
+                    >
+                      <Text style={styles.addMilestoneText}>Add New Step</Text>
+                      <FontAwesome5 name="plus-circle" size={16} color={theme.colors.primary} />
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
           </View>
         </Animated.View>
       </Animated.ScrollView>
@@ -509,6 +703,116 @@ const styles = StyleSheet.create({
   addMilestoneText: {
     fontSize: 16,
     color: '#666',
+  },
+  stepsSection: {
+    marginBottom: 30,
+    paddingHorizontal: 8,
+  },
+  timelineSection: {
+    marginBottom: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    paddingTop: 25,
+  },
+  stepCard: {
+    marginBottom: 16,
+    borderRadius: 12,
+  },
+  stepCardActive: {
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    transform: [{ scale: 1.02 }],
+  },
+  stepHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  stepTitle: {
+    flex: 1,
+    fontSize: 18,
+    marginLeft: 10,
+  },
+  stepDescription: {
+    marginBottom: 8,
+    color: '#666',
+    paddingLeft: 24,
+  },
+  dragHandle: {
+    padding: 4,
+  },
+  emptyStateText: {
+    textAlign: 'center',
+    color: '#888',
+    fontStyle: 'italic',
+    marginVertical: 20,
+    fontSize: 16,
+  },
+  stepImage: {
+    width: '100%',
+    height: 180,
+    resizeMode: 'cover',
+    borderRadius: 8,
+  },
+  completedDate: {
+    fontSize: 13,
+    color: '#888',
+    fontStyle: 'italic',
+    marginTop: 8,
+    textAlign: 'right',
+  },
+  stepsListContainer: {
+    position: 'relative',
+    paddingBottom: 80, // Make room for the FAB
+  },
+  addStepButton: {
+    marginTop: 20,
+    borderRadius: 12,
+    overflow: 'hidden',
+    alignSelf: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  addStepButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    gap: 10,
+  },
+  addStepButtonText: {
+    color: '#FFF',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  addStepFAB: {
+    position: 'absolute',
+    bottom: 20,
+    right: 5,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    overflow: 'hidden',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    zIndex: 100,
+  },
+  addStepFABGradient: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 
