@@ -417,7 +417,9 @@ const styles = StyleSheet.create({
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 30,
+    paddingVertical: 60,
+    paddingHorizontal: 20,
+    flex: 1,
   },
   emptyText: {
     fontSize: 16,
