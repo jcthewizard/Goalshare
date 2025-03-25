@@ -132,7 +132,7 @@ const AddMilestoneScreen: React.FC<Props> = ({ route, navigation }) => {
           style={styles.backButton}
           color={theme.colors.primary}
         />
-        <Text style={styles.headerTitle}>New Milestone</Text>
+        <Text style={styles.headerTitle}>New Step</Text>
         <View style={{ width: 40 }} /> {/* Placeholder for balance */}
       </View>
 
@@ -143,7 +143,7 @@ const AddMilestoneScreen: React.FC<Props> = ({ route, navigation }) => {
         {/* Milestone Form */}
         <View style={styles.formContainer}>
           <TextInput
-            label="Milestone Title"
+            label="Step Title"
             value={title}
             onChangeText={setTitle}
             mode="outlined"
@@ -240,7 +240,7 @@ const AddMilestoneScreen: React.FC<Props> = ({ route, navigation }) => {
             {loading ? (
               <Text style={styles.saveButtonText}>Saving...</Text>
             ) : (
-              <Text style={styles.saveButtonText}>Save Milestone</Text>
+              <Text style={styles.saveButtonText}>Save Step</Text>
             )}
           </TouchableOpacity>
         </View>
