@@ -20,6 +20,7 @@ export type Milestone = {
   description: string;
   completed: boolean;
   imageUri?: string;
+  isMilestone?: boolean;
 };
 
 export type Goal = {

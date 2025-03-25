@@ -265,6 +265,44 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
     // For example: updateMilestoneOrder(goal.id, data.map(item => item.id));
   };
 
+  // Add this after your other useRefs
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const shimmerAnim = useRef(new Animated.Value(0)).current;
+
+  // Add this useEffect for the pulsing animation
+  useEffect(() => {
+    // Create a loop animation for the pulsing effect
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.2,
+          duration: 1000,
+          useNativeDriver: true,
+          easing: Easing.out(Easing.ease),
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+          easing: Easing.in(Easing.ease),
+        }),
+      ])
+    ).start();
+  }, []);
+
+  // Add this useEffect for the shimmer animation
+  useEffect(() => {
+    // Create a loop animation for the shimmer effect
+    Animated.loop(
+      Animated.timing(shimmerAnim, {
+        toValue: 1,
+        duration: 1500,
+        useNativeDriver: false,
+        easing: Easing.linear,
+      })
+    ).start();
+  }, []);
+
   if (!goal) {
     return (
       <View style={styles.container}>
@@ -434,6 +472,14 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                             disabled={isBeingCompleted}
                           >
                             <Card style={styles.fullWidth} elevation={isActive ? 4 : 2}>
+                              {item.isMilestone && (
+                                <LinearGradient
+                                  colors={['#FFF9E6', '#FFFCF3']}
+                                  start={{ x: 0, y: 0 }}
+                                  end={{ x: 1, y: 0 }}
+                                  style={styles.milestoneCardGradient}
+                                />
+                              )}
                               <Card.Content style={styles.stepCardContent}>
                                 <View style={styles.stepHeader}>
                                   <View style={styles.dragHandle}>
@@ -525,13 +571,96 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                       {/* Milestone node */}
                       <Animated.View style={[
                         styles.timelineNode,
-                        { backgroundColor: theme.colors.success }
+                        milestone.isMilestone && styles.milestoneTimelineNode,
+                        { backgroundColor: milestone.isMilestone ? '#FFD700' : theme.colors.success }
                       ]}>
-                        <FontAwesome5 name="check" size={14} color="#FFF" />
+                        {milestone.isMilestone && (
+                          <Animated.View style={[
+                            styles.shimmerOverlay,
+                            {
+                              opacity: shimmerAnim.interpolate({
+                                inputRange: [0, 0.5, 1],
+                                outputRange: [0.1, 0.3, 0.1]
+                              })
+                            }
+                          ]} />
+                        )}
+                        {milestone.isMilestone ? (
+                          <FontAwesome5 name="star" size={16} color="#FFF" />
+                        ) : (
+                          <FontAwesome5 name="check" size={14} color="#FFF" />
+                        )}
                       </Animated.View>
 
                       {/* Milestone content */}
-                      <Card style={styles.milestoneCard}>
+                      <Card style={[
+                        styles.milestoneCard,
+                        milestone.isMilestone && styles.milestoneTimelineCard
+                      ]}>
+                        {milestone.isMilestone && (
+                          <>
+                            <LinearGradient
+                              colors={['#FFF9E6', '#FFFCF3']}
+                              start={{ x: 0, y: 0 }}
+                              end={{ x: 1, y: 0 }}
+                              style={styles.milestoneCardGradient}
+                            />
+                            <Animated.View
+                              style={[
+                                styles.milestoneFireBorder,
+                                { transform: [{ scale: pulseAnim }] }
+                              ]}
+                            >
+                              <LinearGradient
+                                colors={['#FF5F5F', '#FFA500', '#FFD700']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 0, y: 1 }}
+                                style={styles.fireGradient}
+                              />
+                            </Animated.View>
+
+                            {/* Sparkle effects for milestone */}
+                            <View style={styles.sparkleContainer}>
+                              <Animated.View style={[
+                                styles.sparkle,
+                                styles.sparkleTopRight,
+                                {
+                                  opacity: shimmerAnim.interpolate({
+                                    inputRange: [0, 0.3, 0.6, 1],
+                                    outputRange: [0, 1, 0.5, 0]
+                                  }),
+                                  transform: [{
+                                    scale: shimmerAnim.interpolate({
+                                      inputRange: [0, 0.5, 1],
+                                      outputRange: [0.7, 1.2, 0.7]
+                                    })
+                                  }]
+                                }
+                              ]}>
+                                <FontAwesome5 name="sparkles" size={16} color="#FFD700" />
+                              </Animated.View>
+
+                              <Animated.View style={[
+                                styles.sparkle,
+                                styles.sparkleBottomLeft,
+                                {
+                                  opacity: shimmerAnim.interpolate({
+                                    inputRange: [0, 0.5, 0.8, 1],
+                                    outputRange: [0, 0.5, 1, 0]
+                                  }),
+                                  transform: [{
+                                    scale: shimmerAnim.interpolate({
+                                      inputRange: [0, 0.5, 1],
+                                      outputRange: [0.8, 1.1, 0.8]
+                                    })
+                                  }]
+                                }
+                              ]}>
+                                <FontAwesome5 name="star" size={12} color="#FFD700" />
+                              </Animated.View>
+                            </View>
+                          </>
+                        )}
                         <Card.Content>
                           <View style={styles.milestoneHeader}>
                             <Title style={styles.milestoneTitle}>{milestone.title}</Title>
@@ -929,6 +1058,86 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingTop: 3,
     paddingBottom: 0,
+  },
+  milestoneCardGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 10,
+  },
+  milestoneTimelineCard: {
+    borderLeftWidth: 3,
+    borderLeftColor: '#FFD700',
+    borderRadius: 16,
+    overflow: 'visible',
+  },
+  milestoneTimelineTitle: {
+    color: '#B8860B',
+    fontWeight: '700',
+  },
+  milestoneFireBorder: {
+    position: 'absolute',
+    top: -3,
+    left: -3,
+    right: -3,
+    bottom: -3,
+    borderRadius: 18,
+    overflow: 'hidden',
+    zIndex: -1,
+  },
+  fireGradient: {
+    width: '100%',
+    height: '100%',
+    opacity: 0.7,
+  },
+  milestoneTimelineNode: {
+    backgroundColor: '#FFD700',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 3,
+    borderColor: '#FFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
+    zIndex: 3,
+  },
+  shimmerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+  },
+  sparkleContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 10,
+    pointerEvents: 'none',
+  },
+  sparkle: {
+    position: 'absolute',
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sparkleTopRight: {
+    top: -10,
+    right: -10,
+  },
+  sparkleBottomLeft: {
+    bottom: -8,
+    left: -8,
   },
 });
 

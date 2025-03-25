@@ -12,7 +12,7 @@ import {
   Platform,
   Dimensions
 } from 'react-native';
-import { TextInput, Button, Title, useTheme, IconButton } from 'react-native-paper';
+import { TextInput, Button, Title, useTheme, IconButton, Checkbox } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
 import { Camera } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -31,6 +31,7 @@ const AddMilestoneScreen: React.FC<Props> = ({ route, navigation }) => {
   const [description, setDescription] = useState('');
   const [image, setImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isMilestone, setIsMilestone] = useState(false);
   const { addMilestone } = useGoals();
   const theme = useTheme();
 
@@ -111,7 +112,8 @@ const AddMilestoneScreen: React.FC<Props> = ({ route, navigation }) => {
       await addMilestone(goalId, {
         title,
         description,
-        imageUri: image || undefined
+        imageUri: image || undefined,
+        isMilestone
       });
       navigation.goBack();
     } catch (error) {
@@ -171,6 +173,26 @@ const AddMilestoneScreen: React.FC<Props> = ({ route, navigation }) => {
               }
             }}
           />
+
+          <View style={styles.milestoneCheckboxContainer}>
+            <LinearGradient
+              colors={['#FFD700', '#FFA500']}
+              style={styles.milestoneIconBackground}
+            >
+              <FontAwesome5 name="star" size={14} color="#FFF" />
+            </LinearGradient>
+            <View style={styles.milestoneInfoContainer}>
+              <Text style={styles.milestoneLabel}>Mark as significant milestone</Text>
+              <Text style={styles.milestoneSubtext}>
+                Highlight this step with a special icon
+              </Text>
+            </View>
+            <Checkbox
+              status={isMilestone ? 'checked' : 'unchecked'}
+              onPress={() => setIsMilestone(!isMilestone)}
+              color="#FFD700"
+            />
+          </View>
         </View>
 
         {/* Photo Section */}
@@ -382,6 +404,38 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.5,
+  },
+  milestoneCheckboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    marginTop: 8,
+    backgroundColor: '#FFF9E6',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FFE082',
+  },
+  milestoneIconBackground: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  milestoneInfoContainer: {
+    flex: 1,
+  },
+  milestoneLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  milestoneSubtext: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
   },
 });
 
