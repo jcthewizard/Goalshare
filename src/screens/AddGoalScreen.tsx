@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
-import { View, StyleSheet, Alert, ScrollView, SafeAreaView, Platform, StatusBar, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, Alert, ScrollView, SafeAreaView, Platform, StatusBar, TouchableOpacity, ActivityIndicator, Animated } from 'react-native';
 import { TextInput, Button, Title, Switch, Text, Surface } from 'react-native-paper';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useGoals } from '../contexts/GoalContext';
@@ -8,6 +8,7 @@ import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome5 } from '@expo/vector-icons';
+import { format } from 'date-fns';
 
 type Props = StackScreenProps<RootStackParamList, 'AddGoal'>;
 
@@ -17,11 +18,11 @@ const AddGoalScreen: React.FC<Props> = ({ navigation }) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showIOSDatePicker, setShowIOSDatePicker] = useState(false);
+  const [buttonScale] = useState(new Animated.Value(1));
 
   const { addGoal } = useGoals();
 
-
-  
   const handleSave = async () => {
     if (!title) {
       Alert.alert('Error', 'Please enter a goal title');
@@ -54,6 +55,42 @@ const AddGoalScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
+  const openDatePicker = () => {
+    // On iOS, we can show the picker inline
+    // On Android, we need to use the showDatePicker state
+    if (Platform.OS === 'android') {
+      setShowDatePicker(true);
+    }
+  };
+
+  const formatDisplayDate = (date: Date) => {
+    return format(date, "MMMM d, yyyy");
+  };
+  
+  const handlePressIn = () => {
+    Animated.spring(buttonScale, {
+      toValue: 0.98,
+      useNativeDriver: true,
+      friction: 8,
+    }).start();
+  };
+  
+  const handlePressOut = () => {
+    Animated.spring(buttonScale, {
+      toValue: 1,
+      useNativeDriver: true,
+      friction: 6,
+    }).start();
+  };
+
+  const toggleCalendar = () => {
+    if (Platform.OS === 'ios') {
+      setShowIOSDatePicker(!showIOSDatePicker);
+    } else {
+      setShowDatePicker(!showDatePicker);
+    }
+  };
+
   return (
     <LinearGradient
       colors={['#F0F4FF', '#E6EEFF']}
@@ -81,17 +118,71 @@ const AddGoalScreen: React.FC<Props> = ({ navigation }) => {
 
             <View style={styles.datePickerContainer}>
               <Text style={styles.labelText}>Target Date (Optional)</Text>
-              <TouchableOpacity
-                style={styles.dateButton}
-                onPress={() => setShowDatePicker(true)}
-              >
-                <FontAwesome5 name="calendar-alt" size={20} color="#35CAFC" style={styles.calendarIcon} />
-                <Text style={styles.dateText}>
-                  {targetDate ? targetDate.toLocaleDateString() : 'Select a date'}
-                </Text>
-              </TouchableOpacity>
+              
+              <Animated.View style={[
+                styles.dateButtonContainer,
+                { transform: [{ scale: buttonScale }] }
+              ]}>
+                <TouchableOpacity
+                  style={styles.dateButton}
+                  onPress={openDatePicker}
+                  onPressIn={handlePressIn}
+                  onPressOut={handlePressOut}
+                  activeOpacity={0.9}
+                >
+                  <View style={styles.dateButtonContent}>
+                    <View style={styles.calendarIconContainer}>
+                      <LinearGradient
+                        colors={['#35CAFC', '#2D9BF0']}
+                        style={styles.calendarGradient}
+                      >
+                        <FontAwesome5 name="calendar-alt" size={18} color="#FFFFFF" />
+                      </LinearGradient>
+                    </View>
+                    
+                    <View style={styles.dateTextContainer}>
+                      {targetDate ? (
+                        <>
+                          <Text style={styles.dateLabel}>Target Date:</Text>
+                          <Text style={styles.selectedDateText}>
+                            {formatDisplayDate(targetDate)}
+                          </Text>
+                        </>
+                      ) : (
+                        <Text style={styles.placeholderDateText}>
+                          Select a target date
+                        </Text>
+                      )}
+                    </View>
+                    
+                    <TouchableOpacity 
+                      onPress={toggleCalendar}
+                      style={styles.arrowButton}
+                    >
+                      <FontAwesome5 
+                        name={(Platform.OS === 'ios' && showIOSDatePicker) || (Platform.OS === 'android' && showDatePicker) ? "chevron-down" : "chevron-right"} 
+                        size={16} 
+                        color="#BBBBBB" 
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              </Animated.View>
 
-              {showDatePicker && (
+              {/* For iOS, show the date picker only when showIOSDatePicker is true */}
+              {Platform.OS === 'ios' && showIOSDatePicker && (
+                <DateTimePicker
+                  value={targetDate || new Date()}
+                  mode="date"
+                  display="inline"
+                  onChange={handleDateChange}
+                  minimumDate={new Date()}
+                  style={styles.iosDatePicker}
+                />
+              )}
+
+              {/* For Android, show the date picker as a modal when showDatePicker is true */}
+              {Platform.OS === 'android' && showDatePicker && (
                 <DateTimePicker
                   value={targetDate || new Date()}
                   mode="date"
@@ -197,21 +288,52 @@ const styles = StyleSheet.create({
   datePickerContainer: {
     marginBottom: 24,
   },
+  dateButtonContainer: {
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+  },
   dateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
     borderWidth: 1,
-    borderColor: '#D0D0D0',
+    borderColor: '#E5E5E5',
     borderRadius: 16,
     backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
   },
-  calendarIcon: {
-    marginRight: 12,
+  dateButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
   },
-  dateText: {
+  calendarIconContainer: {
+    marginRight: 14,
+  },
+  calendarGradient: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dateTextContainer: {
+    flex: 1,
+  },
+  dateLabel: {
+    fontSize: 12,
+    color: '#888888',
+    marginBottom: 2,
+  },
+  selectedDateText: {
     fontSize: 16,
     color: '#333333',
+    fontWeight: '500',
+  },
+  placeholderDateText: {
+    fontSize: 16,
+    color: '#AAAAAA',
   },
   switchContainer: {
     flexDirection: 'row',
@@ -251,6 +373,14 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  iosDatePicker: {
+    marginTop: 12,
+    height: 320,
+    width: '100%',
+  },
+  arrowButton: {
+    padding: 10,
   },
 });
 

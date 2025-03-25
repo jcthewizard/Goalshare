@@ -1,6 +1,6 @@
 /* eslint-disable */
 // @ts-nocheck
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,11 +9,17 @@ import {
   Image,
   TouchableOpacity,
   Animated,
+  Easing,
   Modal,
   TextInput,
   ActivityIndicator,
   SafeAreaView,
   RefreshControl,
+  Platform,
+  KeyboardAvoidingView,
+  Keyboard,
+  TouchableWithoutFeedback,
+  KeyboardEvent,
 } from 'react-native';
 import { Card, IconButton, Avatar, Divider, useTheme } from 'react-native-paper';
 import { useSocial } from '../contexts/SocialContext';
@@ -36,35 +42,108 @@ const FeedScreen = () => {
 
   // Animation values for each post
   const [itemAnimations, setItemAnimations] = useState({});
+  const initializedItemsRef = useRef(new Set()).current; // Track which items have been initialized
 
-  // Set up animations for feed items
+  // Add this new animated value to track keyboard position
+  const inputPositionY = useRef(new Animated.Value(0)).current;
+  
+  // Improve the keyboard animation synchronization
   useEffect(() => {
-    const animations = {};
-    feedUpdates.forEach((item, index) => {
-      animations[item.id] = {
-        opacity: new Animated.Value(0),
-        translateY: new Animated.Value(50),
-      };
+    // Better handling for keyboard events
+    const keyboardWillShowListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (event) => {
+        const keyboardHeight = event.endCoordinates.height;
+        
+        // Use different animation configurations for iOS and Android
+        if (Platform.OS === 'ios') {
+          // iOS: Use the keyboard's native animation timing
+          Animated.timing(inputPositionY, {
+            toValue: -keyboardHeight,
+            duration: event.duration || 250,
+            useNativeDriver: true,
+            // Use standard easing instead of bezier
+            easing: Easing.out(Easing.ease),
+          }).start();
+        } else {
+          // Android: Use a slightly faster animation with a spring finish
+          Animated.spring(inputPositionY, {
+            toValue: -keyboardHeight,
+            useNativeDriver: true,
+            friction: 8,
+            tension: 40,
+          }).start();
+        }
+      }
+    );
+    
+    const keyboardWillHideListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      (event) => {
+        if (Platform.OS === 'ios') {
+          Animated.timing(inputPositionY, {
+            toValue: 0,
+            duration: event.duration || 250,
+            useNativeDriver: true,
+            // Use standard easing instead of bezier
+            easing: Easing.in(Easing.ease),
+          }).start();
+        } else {
+          Animated.spring(inputPositionY, {
+            toValue: 0,
+            useNativeDriver: true,
+            friction: 8,
+            tension: 40,
+          }).start();
+        }
+      }
+    );
+    
+    return () => {
+      keyboardWillShowListener.remove();
+      keyboardWillHideListener.remove();
+    };
+  }, [inputPositionY]);
 
-      // Start animations with staggered delay
-      const delay = index * 100;
-      Animated.parallel([
-        Animated.timing(animations[item.id].opacity, {
-          toValue: 1,
-          duration: 500,
-          delay,
-          useNativeDriver: true,
-        }),
-        Animated.timing(animations[item.id].translateY, {
-          toValue: 0,
-          duration: 600,
-          delay,
-          useNativeDriver: true,
-        }),
-      ]).start();
+  // Set up animations for feed items - only create animations for new items
+  useEffect(() => {
+    const newAnimations = { ...itemAnimations };
+    let hasNewItems = false;
+
+    feedUpdates.forEach((item, index) => {
+      // Only initialize animations for new items
+      if (!initializedItemsRef.has(item.id)) {
+        hasNewItems = true;
+        initializedItemsRef.add(item.id);
+        
+        newAnimations[item.id] = {
+          opacity: new Animated.Value(0),
+          translateY: new Animated.Value(50),
+        };
+
+        // Start animations with staggered delay
+        const delay = index * 100;
+        Animated.parallel([
+          Animated.timing(newAnimations[item.id].opacity, {
+            toValue: 1,
+            duration: 500,
+            delay,
+            useNativeDriver: true,
+          }),
+          Animated.timing(newAnimations[item.id].translateY, {
+            toValue: 0,
+            duration: 600,
+            delay,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }
     });
 
-    setItemAnimations(animations);
+    // Only update state if we have new items
+    if (hasNewItems) {
+      setItemAnimations(newAnimations);
+    }
   }, [feedUpdates]);
 
   const handleRefresh = async () => {
@@ -74,7 +153,8 @@ const FeedScreen = () => {
     setRefreshing(false);
   };
 
-  const handleLikePress = (postId) => {
+  // Use a memoized handler for like/unlike to avoid re-renders
+  const handleLikePress = useCallback((postId) => {
     const post = feedUpdates.find(update => update.id === postId);
     if (!post || !user) return;
 
@@ -83,7 +163,7 @@ const FeedScreen = () => {
     } else {
       likeFeedItem(postId);
     }
-  };
+  }, [feedUpdates, likeFeedItem, unlikeFeedItem, user]);
 
   const handleAddComment = () => {
     if (commentText.trim() && activePostId) {
@@ -102,8 +182,11 @@ const FeedScreen = () => {
     const isLiked = user ? item.likes.includes(user.uid) : false;
     const hasComments = item.comments && item.comments.length > 0;
 
-    // Get animations for this item
-    const animations = itemAnimations[item.id] || { opacity: new Animated.Value(1), translateY: new Animated.Value(0) };
+    // Use existing animations or create default values for items that don't have animations
+    const animations = itemAnimations[item.id] || { 
+      opacity: new Animated.Value(1), 
+      translateY: new Animated.Value(0) 
+    };
 
     return (
       <Animated.View
@@ -228,6 +311,9 @@ const FeedScreen = () => {
     );
   };
 
+  // use memoized renderItem to prevent unnecessary re-renders
+  const memoizedRenderItem = useCallback(renderItem, [itemAnimations, user, handleLikePress]);
+
   // Comment modal
   const renderCommentModal = () => {
     const post = feedUpdates.find(update => update.id === activePostId);
@@ -240,7 +326,7 @@ const FeedScreen = () => {
         animationType="slide"
         onRequestClose={() => setCommentModalVisible(false)}
       >
-        <SafeAreaView style={styles.modalContainer}>
+        <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Comments</Text>
@@ -250,6 +336,8 @@ const FeedScreen = () => {
                 onPress={() => setCommentModalVisible(false)}
               />
             </View>
+            
+            <View style={styles.modalHandle} />
 
             <FlatList
               data={post.comments}
@@ -273,27 +361,42 @@ const FeedScreen = () => {
                 </View>
               }
               style={styles.modalCommentsList}
+              contentContainerStyle={styles.modalCommentsContent}
             />
 
-            <View style={styles.commentInputContainer}>
-              <TextInput
-                style={styles.commentInput}
-                placeholder="Add a comment..."
-                value={commentText}
-                onChangeText={setCommentText}
-                multiline
-              />
-              <IconButton
-                icon="send"
-                size={24}
-                color={theme.colors.primary}
-                disabled={!commentText.trim()}
-                onPress={handleAddComment}
-                style={styles.sendButton}
-              />
-            </View>
+            {/* Wrap input in Animated.View to move with keyboard */}
+            <Animated.View 
+              style={[
+                styles.inputWrapper,
+                { 
+                  transform: [{ translateY: inputPositionY }],
+                  // Add hardware acceleration hint
+                  backfaceVisibility: 'hidden'
+                }
+              ]}
+            >
+              <View style={styles.commentInputContainer}>
+                <TextInput
+                  style={styles.commentInput}
+                  placeholder="Add a comment..."
+                  value={commentText}
+                  onChangeText={setCommentText}
+                  multiline
+                  autoFocus={true}
+                  textAlignVertical="center"
+                />
+                <IconButton
+                  icon="send"
+                  size={24}
+                  color={theme.colors.primary}
+                  disabled={!commentText.trim()}
+                  onPress={handleAddComment}
+                  style={styles.sendButton}
+                />
+              </View>
+            </Animated.View>
           </View>
-        </SafeAreaView>
+        </View>
       </Modal>
     );
   };
@@ -306,7 +409,7 @@ const FeedScreen = () => {
 
       <AnimatedFlatList
         data={feedUpdates}
-        renderItem={renderItem}
+        renderItem={memoizedRenderItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
@@ -367,6 +470,7 @@ const styles = StyleSheet.create({
   listContent: {
     padding: 8,
     paddingTop: 8,
+    paddingBottom: Platform.OS === 'ios' ? 100 : 85,
   },
   postContainer: {
     marginBottom: 16,
@@ -518,17 +622,25 @@ const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
   },
   modalContent: {
     backgroundColor: 'white',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    maxHeight: '80%',
-    flex: 1,
+    height: '90%',
+    display: 'flex',
+    flexDirection: 'column',
+    position: 'relative',
+  },
+  modalHandle: {
+    width: 40,
+    height: 5,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 3,
+    alignSelf: 'center',
+    marginTop: -8,
+    marginBottom: 8,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -544,47 +656,43 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   modalCommentsList: {
-    maxHeight: '70%',
+    flex: 1,
+    marginBottom: 60,
+  },
+  modalCommentsContent: {
+    paddingBottom: 10,
   },
   modalCommentItem: {
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
-  modalCommentHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  modalCommentUsername: {
-    fontWeight: 'bold',
-    fontSize: 15,
-    color: '#333',
-  },
-  modalCommentTimestamp: {
-    fontSize: 12,
-    color: '#888',
-  },
-  modalCommentText: {
-    fontSize: 15,
-    color: '#444',
-    lineHeight: 20,
-  },
   commentInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginHorizontal: 6,
+    backgroundColor: 'white',
+    borderRadius: 25,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   commentInput: {
     flex: 1,
     backgroundColor: '#f5f5f5',
     borderRadius: 20,
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    maxHeight: 80,
+    paddingVertical: Platform.OS === 'ios' ? 10 : 6,
+    maxHeight: 100,
+    minHeight: 40,
+    textAlignVertical: 'center',
+    justifyContent: 'center',
+    fontSize: 15,
+    lineHeight: 20,
   },
   sendButton: {
     marginLeft: 8,
@@ -597,6 +705,20 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#888',
     textAlign: 'center',
+  },
+  inputWrapper: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingBottom: 10,
+    paddingTop: 5,
+    backgroundColor: 'white',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    zIndex: 999,
+    elevation: 5,
+    transform: [{ translateZ: 0 }],
   },
 });
 
