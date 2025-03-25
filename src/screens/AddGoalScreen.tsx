@@ -20,6 +20,8 @@ const AddGoalScreen: React.FC<Props> = ({ navigation }) => {
 
   const { addGoal } = useGoals();
 
+
+  
   const handleSave = async () => {
     if (!title) {
       Alert.alert('Error', 'Please enter a goal title');
