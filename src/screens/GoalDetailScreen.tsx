@@ -309,17 +309,20 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* Header with goal title and back button */}
+      {/* Header with back button */}
       <View style={styles.header}>
-        <IconButton
-          icon="arrow-left"
-          size={24}
+        <TouchableOpacity
+          style={styles.backButtonContainer}
           onPress={() => navigation.goBack()}
-          style={styles.backButton}
-          color={theme.colors.primary}
-        />
-        <Text style={styles.headerTitle} numberOfLines={1}>{goal.title}</Text>
-        <View style={{ width: 40 }} /> {/* Placeholder for balance */}
+        >
+          <FontAwesome5 name="arrow-left" size={18} color={theme.colors.primary} />
+        </TouchableOpacity>
+
+        <View style={{ flex: 1 }} /> {/* Spacer */}
+
+        <TouchableOpacity style={styles.headerActionButton}>
+          <FontAwesome5 name="ellipsis-h" size={18} color="#777" />
+        </TouchableOpacity>
       </View>
 
       <Animated.ScrollView
@@ -334,7 +337,8 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
         {/* Goal Card with Gradient */}
         <Animated.View style={{
           opacity: fadeAnim,
-          transform: [{ translateY: cardTranslateY }]
+          transform: [{ translateY: cardTranslateY }],
+          marginTop: 0,
         }}>
           <LinearGradient
             colors={['#FF5F5F', '#FF8C8C']}
@@ -343,13 +347,14 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
             style={styles.goalCard}
           >
             <View style={styles.goalCardContent}>
-              <Text style={styles.goalCardTitle}>{goal.title}</Text>
-
-              <View style={styles.goalInfoRow}>
-                <FontAwesome5 name="calendar-alt" size={16} color="#FFF" />
-                <Text style={styles.goalInfoText}>
-                  {goal.targetDate ? format(new Date(goal.targetDate), 'MMM d, yyyy') : 'No target date'}
-                </Text>
+              <View style={styles.goalCardHeader}>
+                <Text style={styles.goalCardTitle}>{goal.title}</Text>
+                <View style={styles.dateContainer}>
+                  <FontAwesome5 name="calendar-alt" size={14} color="#FFF" style={{marginRight: 6}} />
+                  <Text style={styles.goalInfoText}>
+                    {goal.targetDate ? format(new Date(goal.targetDate), 'MMM d, yyyy') : 'No target date'}
+                  </Text>
+                </View>
               </View>
 
               <View style={styles.progressContainer}>
@@ -580,21 +585,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 8,
-    paddingTop: 10,
-    height: 60,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
-  backButton: {
-    marginRight: 8,
+  backButtonContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f5f5f5',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  headerTitle: {
-    flex: 1,
-    fontSize: 20,
-    fontWeight: '700',
-    textAlign: 'center',
+  headerActionButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f5f5f5',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollContent: {
     padding: 16,
+    paddingTop: 8,
     paddingBottom: 40,
   },
   notFoundText: {
@@ -613,26 +625,36 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   goalCardContent: {
-    padding: 20,
+    padding: 16,
+  },
+  goalCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   goalCardTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '700',
     color: 'white',
-    marginBottom: 16,
+    flex: 1,
+    marginRight: 12,
   },
-  goalInfoRow: {
+  dateContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
   goalInfoText: {
     color: 'white',
-    marginLeft: 10,
-    fontSize: 16,
+    fontSize: 13,
+    fontWeight: '500',
   },
   progressContainer: {
-    marginBottom: 10,
+    marginTop: 0,
   },
   progressLabel: {
     color: 'white',
