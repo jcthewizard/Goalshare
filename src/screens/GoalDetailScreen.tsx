@@ -36,6 +36,13 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
   const { user } = useAuth();
   const [goal, setGoal] = useState(goalState.goals.find((g) => g.id === goalId) || null);
   const [animatedValues, setAnimatedValues] = useState<{[key: string]: Animated.Value}>({});
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [themeColors, setThemeColors] = useState({
+    primary: '#FF5F5F',
+    secondary: '#FF8C8C',
+    accent: '#FFD700'
+  });
+  const colorPickerAnim = useRef(new Animated.Value(0)).current;
   const theme = useTheme();
   const scrollY = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -303,6 +310,28 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
     ).start();
   }, []);
 
+  // Toggle color picker
+  const toggleColorPicker = () => {
+    const toValue = showColorPicker ? 0 : 1;
+    Animated.spring(colorPickerAnim, {
+      toValue,
+      tension: 40,
+      friction: 7,
+      useNativeDriver: true
+    }).start();
+    setShowColorPicker(!showColorPicker);
+  };
+
+  // Change theme colors
+  const changeThemeColors = (primary, secondary, accent) => {
+    setThemeColors({
+      primary,
+      secondary,
+      accent
+    });
+    toggleColorPicker();
+  };
+
   if (!goal) {
     return (
       <View style={styles.container}>
@@ -358,9 +387,64 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
 
         <View style={{ flex: 1 }} /> {/* Spacer */}
 
-        <TouchableOpacity style={styles.headerActionButton}>
-          <FontAwesome5 name="ellipsis-h" size={18} color="#777" />
-        </TouchableOpacity>
+        <View style={styles.colorPickerContainer}>
+          {/* Color options */}
+          <Animated.View style={[
+            styles.colorOptions,
+            {
+              opacity: colorPickerAnim,
+              transform: [{
+                translateX: colorPickerAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [30, 0]
+                })
+              },
+              {
+                scale: colorPickerAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.8, 1]
+                })
+              }]
+            }
+          ]}>
+            {/* Red theme */}
+            <TouchableOpacity
+              style={[styles.colorOption, { backgroundColor: '#FF5F5F' }]}
+              onPress={() => changeThemeColors('#FF5F5F', '#FF8C8C', '#FFD700')}
+            />
+            {/* Blue theme */}
+            <TouchableOpacity
+              style={[styles.colorOption, { backgroundColor: '#35CAFC' }]}
+              onPress={() => changeThemeColors('#35CAFC', '#70D6FF', '#FFD700')}
+            />
+            {/* Purple theme */}
+            <TouchableOpacity
+              style={[styles.colorOption, { backgroundColor: '#9C27B0' }]}
+              onPress={() => changeThemeColors('#9C27B0', '#BA68C8', '#E1BEE7')}
+            />
+            {/* Green theme */}
+            <TouchableOpacity
+              style={[styles.colorOption, { backgroundColor: '#4CAF50' }]}
+              onPress={() => changeThemeColors('#4CAF50', '#81C784', '#C8E6C9')}
+            />
+            {/* Orange theme */}
+            <TouchableOpacity
+              style={[styles.colorOption, { backgroundColor: '#FF9800' }]}
+              onPress={() => changeThemeColors('#FF9800', '#FFCC80', '#FFE082')}
+            />
+          </Animated.View>
+
+          {/* Color wheel button */}
+          <TouchableOpacity
+            style={[
+              styles.headerActionButton,
+              showColorPicker && {backgroundColor: '#f0f0f0'}
+            ]}
+            onPress={toggleColorPicker}
+          >
+            <FontAwesome5 name="palette" size={18} color={showColorPicker ? themeColors.primary : "#777"} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <Animated.ScrollView
@@ -379,7 +463,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
           marginTop: 0,
         }}>
           <LinearGradient
-            colors={['#FF5F5F', '#FF8C8C']}
+            colors={[themeColors.primary, themeColors.secondary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.goalCard}
@@ -428,7 +512,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                   onPress={() => navigation.navigate('AddMilestone', { goalId: goal.id })}
                 >
                   <LinearGradient
-                    colors={['#FF5F5F', '#FF8C8C']}
+                    colors={[themeColors.primary, themeColors.secondary]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.addStepButtonGradient}
@@ -474,7 +558,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                             <Card style={styles.fullWidth} elevation={isActive ? 4 : 2}>
                               {item.isMilestone && (
                                 <LinearGradient
-                                  colors={['#FFF9E6', '#FFFCF3']}
+                                  colors={[`${themeColors.accent}20`, '#FFFCF3']}
                                   start={{ x: 0, y: 0 }}
                                   end={{ x: 1, y: 0 }}
                                   style={styles.milestoneCardGradient}
@@ -487,9 +571,15 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                                   </View>
                                   <Title style={styles.stepTitle}>{item.title}</Title>
                                   <TouchableOpacity
-                                    style={styles.checkboxContainer}
+                                    style={[
+                                      styles.checkboxContainer,
+                                      item.isMilestone && [styles.milestoneCheckboxContainer, { borderColor: themeColors.accent }]
+                                    ]}
                                     onPress={() => handleCompleteMilestone(item.id, item.completed)}
                                   >
+                                    {item.isMilestone && (
+                                      <FontAwesome5 name="star" size={10} color={themeColors.accent} style={styles.milestoneIcon} />
+                                    )}
                                     <FontAwesome5 name="check" size={14} color="transparent" />
                                   </TouchableOpacity>
                                 </View>
@@ -520,7 +610,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                     onPress={() => navigation.navigate('AddMilestone', { goalId: goal.id })}
                   >
                     <LinearGradient
-                      colors={['#FF5F5F', '#FF8C8C']}
+                      colors={[themeColors.primary, themeColors.secondary]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
                       style={styles.addStepFABGradient}
@@ -572,7 +662,9 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                       <Animated.View style={[
                         styles.timelineNode,
                         milestone.isMilestone && styles.milestoneTimelineNode,
-                        { backgroundColor: milestone.isMilestone ? '#FFD700' : theme.colors.success }
+                        {
+                          backgroundColor: milestone.isMilestone ? themeColors.accent : themeColors.primary
+                        }
                       ]}>
                         {milestone.isMilestone && (
                           <Animated.View style={[
@@ -586,7 +678,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                           ]} />
                         )}
                         {milestone.isMilestone ? (
-                          <FontAwesome5 name="star" size={16} color="#FFF" />
+                          <FontAwesome5 name="star" size={16} color={themeColors.accent} />
                         ) : (
                           <FontAwesome5 name="check" size={14} color="#FFF" />
                         )}
@@ -595,12 +687,15 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                       {/* Milestone content */}
                       <Card style={[
                         styles.milestoneCard,
-                        milestone.isMilestone && styles.milestoneTimelineCard
+                        milestone.isMilestone && [
+                          styles.milestoneTimelineCard,
+                          { borderLeftColor: themeColors.accent }
+                        ]
                       ]}>
                         {milestone.isMilestone && (
                           <>
                             <LinearGradient
-                              colors={['#FFF9E6', '#FFFCF3']}
+                              colors={[`${themeColors.accent}20`, '#FFFCF3']}
                               start={{ x: 0, y: 0 }}
                               end={{ x: 1, y: 0 }}
                               style={styles.milestoneCardGradient}
@@ -612,7 +707,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                               ]}
                             >
                               <LinearGradient
-                                colors={['#FF5F5F', '#FFA500', '#FFD700']}
+                                colors={[themeColors.primary, themeColors.secondary, themeColors.accent]}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 0, y: 1 }}
                                 style={styles.fireGradient}
@@ -637,7 +732,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                                   }]
                                 }
                               ]}>
-                                <FontAwesome5 name="sparkles" size={16} color="#FFD700" />
+                                <FontAwesome5 name="sparkles" size={16} color={themeColors.accent} />
                               </Animated.View>
 
                               <Animated.View style={[
@@ -656,14 +751,19 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                                   }]
                                 }
                               ]}>
-                                <FontAwesome5 name="star" size={12} color="#FFD700" />
+                                <FontAwesome5 name="star" size={12} color={themeColors.accent} />
                               </Animated.View>
                             </View>
                           </>
                         )}
                         <Card.Content>
                           <View style={styles.milestoneHeader}>
-                            <Title style={styles.milestoneTitle}>{milestone.title}</Title>
+                            <Title style={[
+                              styles.milestoneTitle,
+                              milestone.isMilestone && { color: themeColors.accent }
+                            ]}>
+                              {milestone.title}
+                            </Title>
                             <TouchableOpacity
                               style={[styles.checkboxContainer, styles.checkboxCompleted]}
                               onPress={() => handleCompleteMilestone(milestone.id, milestone.completed)}
@@ -724,6 +824,33 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  colorPickerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  colorOptions: {
+    flexDirection: 'row',
+    position: 'absolute',
+    right: 50,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingRight: 10,
+    width: 180,
+  },
+  colorOption: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    margin: 3,
+    borderWidth: 2,
+    borderColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
+    elevation: 2,
   },
   headerActionButton: {
     width: 40,
@@ -1138,6 +1265,20 @@ const styles = StyleSheet.create({
   sparkleBottomLeft: {
     bottom: -8,
     left: -8,
+  },
+  milestoneCheckboxContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#35CAFC',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 6,
+    alignSelf: 'center',
+  },
+  milestoneIcon: {
+    marginRight: 4,
   },
 });
 
