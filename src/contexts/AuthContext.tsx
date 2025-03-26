@@ -4,8 +4,54 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
 // Update this to match your backend URL
-// If using a physical device, use your computer's IP address instead of localhost
-const API_URL = 'http://172.16.71.32:5001/api';
+// Option 1: For emulator or dev on same machine (DON'T USE THIS - DOESN'T WORK ON REAL DEVICES)
+// const API_URL = 'http://localhost:5001/api'; 
+// Option 2: For physical device or networks where IP is needed (USE THIS ONE)
+const API_URL = 'http://172.16.71.32:5001/api'; // Updated to use your correct IP address
+// Option 3: If running on the same device
+// const API_URL = 'http://127.0.0.1:5001/api';
+
+// Configure axios defaults
+axios.defaults.timeout = 15000; // Increased timeout to 15 seconds
+
+// Add request/response interceptors for debugging
+axios.interceptors.request.use(request => {
+  console.log('🚀 REQUEST:', {
+    url: request.url,
+    method: request.method,
+    data: request.data,
+    headers: request.headers
+  });
+  return request;
+}, error => {
+  console.error('❌ REQUEST ERROR:', error);
+  return Promise.reject(error);
+});
+
+axios.interceptors.response.use(response => {
+  console.log('✅ RESPONSE:', {
+    status: response.status,
+    statusText: response.statusText,
+    data: response.data,
+    headers: response.headers
+  });
+  return response;
+}, error => {
+  console.error('❌ RESPONSE ERROR:', {
+    message: error.message,
+    code: error.code,
+    config: error.config ? {
+      url: error.config.url,
+      method: error.config.method,
+      timeout: error.config.timeout
+    } : 'No config',
+    response: error.response ? {
+      status: error.response.status,
+      data: error.response.data
+    } : 'No response'
+  });
+  return Promise.reject(error);
+});
 
 /**
  * Auth action types
@@ -88,8 +134,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Setup axios auth header when token changes
   useEffect(() => {
     if (state.token) {
+      console.log('🔑 AUTH: Setting auth header with token');
       axios.defaults.headers.common['Authorization'] = `Bearer ${state.token}`;
     } else {
+      console.log('⚠️ AUTH: No token available to set auth header');
       delete axios.defaults.headers.common['Authorization'];
     }
   }, [state.token]);
@@ -103,10 +151,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         dispatch({ type: 'SET_LOADING', payload: true });
         
         const storedToken = await AsyncStorage.getItem(TOKEN_STORAGE_KEY);
+        console.log('🔄 AUTH: Loaded token from storage:', storedToken ? 'Token exists' : 'No token');
         
         if (storedToken) {
+          console.log('🔑 AUTH: Setting token from storage');
           dispatch({ type: 'SET_TOKEN', payload: storedToken });
           await fetchUserData(storedToken);
+        } else {
+          console.log('⚠️ AUTH: No token found in storage');
         }
       } catch (error) {
         console.error('Failed to load auth state:', error);
@@ -152,31 +204,81 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    */
   const login = async (email: string, password: string): Promise<void> => {
     try {
+      console.log('🔑 LOGIN: Attempt with email:', email);
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'SET_ERROR', payload: null });
 
-      const response = await axios.post(`${API_URL}/auth/login`, { email, password });
-      const { token, user: userData } = response.data;
-      
-      // Convert backend user to our User type
-      const user: User = {
-        uid: userData._id,
-        email: userData.email,
-        displayName: userData.name || userData.email.split('@')[0],
-        photoURL: null,
-      };
-      
-      await AsyncStorage.setItem(TOKEN_STORAGE_KEY, token);
-      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
-      
-      dispatch({ type: 'SET_TOKEN', payload: token });
-      dispatch({ type: 'SET_USER', payload: user });
+      // Try connecting to the backend
+      try {
+        console.log('🔌 LOGIN: Connecting to backend at:', API_URL);
+        const response = await axios.post(`${API_URL}/auth/login`, { email, password });
+        console.log('✅ LOGIN: Backend connection successful');
+        
+        const { token, user: userData } = response.data;
+        
+        // Convert backend user to our User type
+        const user: User = {
+          uid: userData._id,
+          email: userData.email,
+          displayName: userData.name || userData.email.split('@')[0],
+          photoURL: null,
+        };
+        
+        console.log('💾 LOGIN: Saving token and user data to storage');
+        await AsyncStorage.setItem(TOKEN_STORAGE_KEY, token);
+        await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+        
+        dispatch({ type: 'SET_TOKEN', payload: token });
+        dispatch({ type: 'SET_USER', payload: user });
+        console.log('✅ LOGIN: Process completed successfully');
+      } catch (error: any) {
+        console.error('❌ LOGIN: Connection error details:', error);
+        console.error('❌ LOGIN: Error type:', typeof error);
+        console.error('❌ LOGIN: Is AxiosError:', error.isAxiosError ? 'Yes' : 'No');
+        console.error('❌ LOGIN: Error name:', error.name);
+        console.error('❌ LOGIN: Error code:', error.code);
+        console.error('❌ LOGIN: Error stack:', error.stack);
+        
+        if (error.config) {
+          console.error('❌ LOGIN: Request config:', {
+            url: error.config.url,
+            method: error.config.method,
+            timeout: error.config.timeout,
+            headers: error.config.headers
+          });
+        }
+        
+        // Network connectivity check
+        if (error.message?.includes('Network Error')) {
+          console.error('❌ LOGIN: Network connectivity issue detected');
+        }
+        
+        // Check for MongoDB connection errors
+        const errorDetails = error.response?.data?.message || '';
+        if (error.code === 'ECONNABORTED' || 
+            error.message?.includes('timeout') || 
+            errorDetails.includes('MongoDB') ||
+            error.message?.includes('Network Error')) {
+          
+          // Show a more helpful error for MongoDB connection issues
+          const errorMessage = 'Backend database connection error. Please try using the Direct Login button in Development Options.';
+          console.error('❌ LOGIN: Database connection error detected');
+          dispatch({ type: 'SET_ERROR', payload: errorMessage });
+          throw new Error(errorMessage);
+        }
+        
+        const errorMessage = error.response?.data?.message || 
+                            (error instanceof Error ? error.message : 'Login failed');
+        console.error('❌ LOGIN: Error message set:', errorMessage);
+        dispatch({ type: 'SET_ERROR', payload: errorMessage });
+        throw new Error(errorMessage);
+      }
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 
-                          (error instanceof Error ? error.message : 'Login failed');
-      dispatch({ type: 'SET_ERROR', payload: errorMessage });
-      throw new Error(errorMessage);
+      // This will catch any errors from the first try block
+      console.error('❌ LOGIN: Final error handler reached:', error.message);
+      throw error; 
     } finally {
+      console.log('🏁 LOGIN: Process finished (success or failure)');
       dispatch({ type: 'SET_LOADING', payload: false });
     }
   };

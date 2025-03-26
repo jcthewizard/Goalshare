@@ -1,395 +1,428 @@
-import React, { createContext, useContext, useReducer } from 'react';
-import { v4 as uuidv4 } from 'uuid';
+import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import axios from 'axios';
 import { useAuth } from './AuthContext';
-import { Goal, Milestone, GoalState } from '../types';
+import { Goal } from '../types';
 
-// Context type
-type GoalContextType = {
+// Update this to match your backend URL
+// Option 1: For emulator or dev on same machine (DON'T USE THIS - DOESN'T WORK ON REAL DEVICES) 
+// const API_URL = 'http://localhost:5001/api'; 
+// Option 2: For physical device or networks where IP is needed (USE THIS ONE)
+const API_URL = `http://${process.env.IP}:5001/api`;
+// Option 3: If running on the same device
+// const API_URL = 'http://127.0.0.1:5001/api';
+
+// Configure axios timeout for goal-related requests
+axios.defaults.timeout = 15000; // 15 second timeout
+
+// Goal state type
+interface GoalState {
+  goals: Goal[];
+  loading: boolean;
+  error: string | null;
+}
+
+// Goal action types
+type GoalAction =
+  | { type: 'SET_GOALS'; payload: Goal[] }
+  | { type: 'ADD_GOAL'; payload: Goal }
+  | { type: 'UPDATE_GOAL'; payload: Goal }
+  | { type: 'DELETE_GOAL'; payload: string }
+  | { type: 'ADD_MILESTONE'; payload: { goalId: string; milestone: any } }
+  | { type: 'UPDATE_MILESTONE'; payload: { goalId: string; milestoneId: string; milestone: any } }
+  | { type: 'DELETE_MILESTONE'; payload: { goalId: string; milestoneId: string } }
+  | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'SET_ERROR'; payload: string | null };
+
+// Goal context type
+interface GoalContextType {
   goalState: GoalState;
-  fetchGoals: () => Promise<void>;
-  addGoal: (goalData: Omit<Goal, 'id' | 'userId' | 'createdAt' | 'milestones' | 'completed'>) => Promise<string>;
-  updateGoal: (goalId: string, goalData: Partial<Goal>) => Promise<void>;
-  deleteGoal: (goalId: string) => Promise<void>;
-  completeGoal: (goalId: string) => Promise<void>;
-  addMilestone: (goalId: string, milestoneData: Omit<Milestone, 'id' | 'completed'>) => Promise<string>;
-  updateMilestone: (goalId: string, milestoneId: string, milestoneData: Partial<Milestone>) => Promise<void>;
+  getGoals: () => Promise<void>;
+  getGoal: (id: string) => Promise<Goal>;
+  addGoal: (goal: Partial<Goal>) => Promise<Goal>;
+  updateGoal: (id: string, goal: Partial<Goal>) => Promise<Goal>;
+  deleteGoal: (id: string) => Promise<void>;
+  addMilestone: (goalId: string, milestone: any) => Promise<any>;
+  updateMilestone: (goalId: string, milestoneId: string, milestone: any) => Promise<any>;
   deleteMilestone: (goalId: string, milestoneId: string) => Promise<void>;
-  completeMilestone: (goalId: string, milestoneId: string, isCompleted: boolean) => Promise<void>;
-};
+  toggleMilestoneCompletion: (goalId: string, milestoneId: string, isCompleted: boolean) => Promise<any>;
+}
 
 // Initial state
 const initialState: GoalState = {
   goals: [],
   loading: false,
-  error: null,
-};
-
-// Mock data for development
-const MOCK_GOALS: Goal[] = [
-  {
-    id: 'goal-1',
-    userId: 'dev-user-123',
-    title: 'Learn React Native',
-    targetDate: new Date(2024, 11, 31),
-    isPinned: true,
-    createdAt: new Date(2024, 5, 1),
-    completed: false,
-    milestones: [
-      {
-        id: 'milestone-1',
-        title: 'Set up development environment',
-        description: 'Install Node.js, expo CLI, and Android Studio',
-        completed: true,
-      },
-      {
-        id: 'milestone-2',
-        title: 'Complete React Native tutorial',
-        description: 'Follow the official React Native tutorial',
-        completed: false,
-      },
-      {
-        id: 'milestone-3',
-        title: 'Build first app',
-        description: 'Create a basic to-do app with React Native',
-        completed: false,
-      },
-    ],
-  },
-  {
-    id: 'goal-2',
-    userId: 'dev-user-123',
-    title: 'Get fit',
-    targetDate: new Date(2024, 11, 31),
-    isPinned: false,
-    createdAt: new Date(2024, 5, 15),
-    completed: false,
-    milestones: [
-      {
-        id: 'milestone-4',
-        title: 'Join a gym',
-        description: 'Find a gym close to home and sign up',
-        completed: true,
-      },
-      {
-        id: 'milestone-5',
-        title: 'Work out 3x per week',
-        description: 'Establish a workout routine',
-        completed: false,
-      },
-    ],
-  },
-];
-
-// Action types
-type GoalAction =
-  | { type: 'FETCH_GOALS_INIT' }
-  | { type: 'FETCH_GOALS_SUCCESS'; payload: Goal[] }
-  | { type: 'FETCH_GOALS_ERROR'; payload: string }
-  | { type: 'ADD_GOAL_SUCCESS'; payload: Goal }
-  | { type: 'UPDATE_GOAL_SUCCESS'; payload: { goalId: string; data: Partial<Goal> } }
-  | { type: 'DELETE_GOAL_SUCCESS'; payload: string }
-  | { type: 'ADD_MILESTONE_SUCCESS'; payload: { goalId: string; milestone: Milestone } }
-  | { type: 'UPDATE_MILESTONE_SUCCESS'; payload: { goalId: string; milestoneId: string; data: Partial<Milestone> } }
-  | { type: 'DELETE_MILESTONE_SUCCESS'; payload: { goalId: string; milestoneId: string } };
-
-// Reducer
-const goalReducer = (state: GoalState, action: GoalAction): GoalState => {
-  switch (action.type) {
-    case 'FETCH_GOALS_INIT':
-      return {
-        ...state,
-        loading: true,
-        error: null,
-      };
-    case 'FETCH_GOALS_SUCCESS':
-      return {
-        ...state,
-        goals: action.payload,
-        loading: false,
-        error: null,
-      };
-    case 'FETCH_GOALS_ERROR':
-      return {
-        ...state,
-        loading: false,
-        error: action.payload,
-      };
-    case 'ADD_GOAL_SUCCESS':
-      return {
-        ...state,
-        goals: [...state.goals, action.payload],
-        loading: false,
-        error: null,
-      };
-    case 'UPDATE_GOAL_SUCCESS': {
-      const { goalId, data } = action.payload;
-      const updatedGoals = state.goals.map((goal) =>
-        goal.id === goalId ? { ...goal, ...data } : goal
-      );
-      return {
-        ...state,
-        goals: updatedGoals,
-      };
-    }
-    case 'DELETE_GOAL_SUCCESS':
-      return {
-        ...state,
-        goals: state.goals.filter((goal) => goal.id !== action.payload),
-      };
-    case 'ADD_MILESTONE_SUCCESS': {
-      const { goalId, milestone } = action.payload;
-      const updatedGoals = state.goals.map((goal) =>
-        goal.id === goalId
-          ? { ...goal, milestones: [...goal.milestones, milestone] }
-          : goal
-      );
-      return {
-        ...state,
-        goals: updatedGoals,
-      };
-    }
-    case 'UPDATE_MILESTONE_SUCCESS': {
-      const { goalId, milestoneId, data } = action.payload;
-      const updatedGoals = state.goals.map((goal) => {
-        if (goal.id === goalId) {
-          const updatedMilestones = goal.milestones.map((milestone) =>
-            milestone.id === milestoneId ? { ...milestone, ...data } : milestone
-          );
-          return { ...goal, milestones: updatedMilestones };
-        }
-        return goal;
-      });
-      return {
-        ...state,
-        goals: updatedGoals,
-      };
-    }
-    case 'DELETE_MILESTONE_SUCCESS': {
-      const { goalId, milestoneId } = action.payload;
-      const updatedGoals = state.goals.map((goal) => {
-        if (goal.id === goalId) {
-          return {
-            ...goal,
-            milestones: goal.milestones.filter((m) => m.id !== milestoneId),
-          };
-        }
-        return goal;
-      });
-      return {
-        ...state,
-        goals: updatedGoals,
-      };
-    }
-    default:
-      return state;
-  }
+  error: null
 };
 
 // Create context
 const GoalContext = createContext<GoalContextType | undefined>(undefined);
 
+// Goal reducer
+const goalReducer = (state: GoalState, action: GoalAction): GoalState => {
+  switch (action.type) {
+    case 'SET_GOALS':
+      return {
+        ...state,
+        goals: action.payload,
+        loading: false
+      };
+    case 'ADD_GOAL':
+      return {
+        ...state,
+        goals: [action.payload, ...state.goals],
+        loading: false
+      };
+    case 'UPDATE_GOAL':
+      return {
+        ...state,
+        goals: state.goals.map(goal =>
+          goal.id === action.payload.id ? action.payload : goal
+        ),
+        loading: false
+      };
+    case 'DELETE_GOAL':
+      return {
+        ...state,
+        goals: state.goals.filter(goal => goal.id !== action.payload),
+        loading: false
+      };
+    case 'ADD_MILESTONE':
+      return {
+        ...state,
+        goals: state.goals.map(goal => {
+          if (goal.id === action.payload.goalId) {
+            return {
+              ...goal,
+              milestones: [action.payload.milestone, ...(goal.milestones || [])]
+            };
+          }
+          return goal;
+        }),
+        loading: false
+      };
+    case 'UPDATE_MILESTONE':
+      return {
+        ...state,
+        goals: state.goals.map(goal => {
+          if (goal.id === action.payload.goalId) {
+            return {
+              ...goal,
+              milestones: (goal.milestones || []).map(milestone =>
+                milestone.id === action.payload.milestoneId
+                  ? action.payload.milestone
+                  : milestone
+              )
+            };
+          }
+          return goal;
+        }),
+        loading: false
+      };
+    case 'DELETE_MILESTONE':
+      return {
+        ...state,
+        goals: state.goals.map(goal => {
+          if (goal.id === action.payload.goalId) {
+            return {
+              ...goal,
+              milestones: (goal.milestones || []).filter(
+                milestone => milestone.id !== action.payload.milestoneId
+              )
+            };
+          }
+          return goal;
+        }),
+        loading: false
+      };
+    case 'SET_LOADING':
+      return {
+        ...state,
+        loading: action.payload
+      };
+    case 'SET_ERROR':
+      return {
+        ...state,
+        error: action.payload,
+        loading: false
+      };
+    default:
+      return state;
+  }
+};
+
 // Provider component
 export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [goalState, dispatch] = useReducer(goalReducer, initialState);
-  const { user } = useAuth();
+  const [state, dispatch] = useReducer(goalReducer, initialState);
+  const { token } = useAuth();
 
-  // Fetch goals for the current user (mock implementation)
-  const fetchGoals = async () => {
+  // Set axios auth header when token changes
+  useEffect(() => {
+    if (token) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    } else {
+      delete axios.defaults.headers.common['Authorization'];
+    }
+  }, [token]);
+
+  // Get all goals for the current user
+  const getGoals = async (): Promise<void> => {
+    if (!token) return;
+
     try {
-      dispatch({ type: 'FETCH_GOALS_INIT' });
-
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Use mock data
-      const filteredGoals = user ?
-        MOCK_GOALS.filter(goal => goal.userId === user.uid) :
-        [];
-
-      dispatch({ type: 'FETCH_GOALS_SUCCESS', payload: filteredGoals });
+      dispatch({ type: 'SET_LOADING', payload: true });
+      console.log('🔍 GOALS: Fetching goals with token:', token ? 'Token exists' : 'No token');
+      
+      // Explicitly set the auth header for this request
+      const config = {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      };
+      
+      console.log('🔑 GOALS: Using headers:', config.headers);
+      const res = await axios.get(`${API_URL}/goals`, config);
+      
+      // Transform backend format to frontend format
+      const transformedGoals = res.data.map((goal: any) => ({
+        id: goal._id,
+        title: goal.title,
+        targetDate: goal.targetDate,
+        isPinned: goal.isPinned,
+        completed: goal.completed,
+        milestones: goal.milestones.map((m: any) => ({
+          id: m._id,
+          title: m.title,
+          description: m.description,
+          completed: m.completed,
+          imageUri: m.imageUri,
+          isMilestone: m.isMilestone,
+          createdAt: m.createdAt
+        })),
+        createdAt: goal.createdAt
+      }));
+      
+      dispatch({ type: 'SET_GOALS', payload: transformedGoals });
     } catch (error) {
-      let errorMessage = 'Failed to fetch goals';
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      dispatch({ type: 'FETCH_GOALS_ERROR', payload: errorMessage });
+      console.error('Get goals error:', error);
+      dispatch({ type: 'SET_ERROR', payload: 'Error fetching goals' });
+    }
+  };
+
+  // Get a single goal by ID
+  const getGoal = async (id: string): Promise<Goal> => {
+    try {
+      dispatch({ type: 'SET_LOADING', payload: true });
+      const res = await axios.get(`${API_URL}/goals/${id}`);
+      
+      // Transform backend format to frontend format
+      const transformedGoal = {
+        id: res.data._id,
+        title: res.data.title,
+        targetDate: res.data.targetDate,
+        isPinned: res.data.isPinned,
+        completed: res.data.completed,
+        milestones: res.data.milestones.map((m: any) => ({
+          id: m._id,
+          title: m.title,
+          description: m.description,
+          completed: m.completed,
+          imageUri: m.imageUri,
+          isMilestone: m.isMilestone,
+          createdAt: m.createdAt
+        })),
+        createdAt: res.data.createdAt
+      };
+      
+      dispatch({ type: 'SET_LOADING', payload: false });
+      return transformedGoal;
+    } catch (error) {
+      console.error('Get goal error:', error);
+      dispatch({ type: 'SET_ERROR', payload: 'Error fetching goal' });
+      throw error;
     }
   };
 
   // Add a new goal
-  const addGoal = async (goalData: Omit<Goal, 'id' | 'userId' | 'createdAt' | 'milestones' | 'completed'>) => {
-    if (!user) throw new Error('User must be authenticated');
-
+  const addGoal = async (goal: Partial<Goal>): Promise<Goal> => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      const newGoalId = `goal-${Date.now()}`;
-
-      const goalWithId: Goal = {
-        ...goalData,
-        id: newGoalId,
-        userId: user.uid,
-        createdAt: new Date(),
-        milestones: [],
-        completed: false,
+      dispatch({ type: 'SET_LOADING', payload: true });
+      const res = await axios.post(`${API_URL}/goals`, goal);
+      
+      // Transform backend format to frontend format
+      const transformedGoal = {
+        id: res.data._id,
+        title: res.data.title,
+        targetDate: res.data.targetDate,
+        isPinned: res.data.isPinned,
+        completed: res.data.completed,
+        milestones: res.data.milestones?.map((m: any) => ({
+          id: m._id,
+          title: m.title,
+          description: m.description,
+          completed: m.completed,
+          imageUri: m.imageUri,
+          isMilestone: m.isMilestone,
+          createdAt: m.createdAt
+        })) || [],
+        createdAt: res.data.createdAt
       };
-
-      dispatch({ type: 'ADD_GOAL_SUCCESS', payload: goalWithId });
-
-      return newGoalId;
+      
+      dispatch({ type: 'ADD_GOAL', payload: transformedGoal });
+      return transformedGoal;
     } catch (error) {
-      let errorMessage = 'Failed to add goal';
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      throw new Error(errorMessage);
+      console.error('Add goal error:', error);
+      dispatch({ type: 'SET_ERROR', payload: 'Error adding goal' });
+      throw error;
     }
   };
 
-  // Update a goal
-  const updateGoal = async (goalId: string, goalData: Partial<Goal>) => {
-    if (!user) throw new Error('User must be authenticated');
-
+  // Update an existing goal
+  const updateGoal = async (id: string, goal: Partial<Goal>): Promise<Goal> => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      dispatch({
-        type: 'UPDATE_GOAL_SUCCESS',
-        payload: { goalId, data: goalData },
-      });
+      dispatch({ type: 'SET_LOADING', payload: true });
+      const res = await axios.put(`${API_URL}/goals/${id}`, goal);
+      
+      // Transform backend format to frontend format
+      const transformedGoal = {
+        id: res.data._id,
+        title: res.data.title,
+        targetDate: res.data.targetDate,
+        isPinned: res.data.isPinned,
+        completed: res.data.completed,
+        milestones: res.data.milestones?.map((m: any) => ({
+          id: m._id,
+          title: m.title,
+          description: m.description,
+          completed: m.completed,
+          imageUri: m.imageUri,
+          isMilestone: m.isMilestone,
+          createdAt: m.createdAt
+        })) || [],
+        createdAt: res.data.createdAt
+      };
+      
+      dispatch({ type: 'UPDATE_GOAL', payload: transformedGoal });
+      return transformedGoal;
     } catch (error) {
-      let errorMessage = 'Failed to update goal';
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      throw new Error(errorMessage);
+      console.error('Update goal error:', error);
+      dispatch({ type: 'SET_ERROR', payload: 'Error updating goal' });
+      throw error;
     }
   };
 
   // Delete a goal
-  const deleteGoal = async (goalId: string) => {
-    if (!user) throw new Error('User must be authenticated');
-
+  const deleteGoal = async (id: string): Promise<void> => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      dispatch({ type: 'DELETE_GOAL_SUCCESS', payload: goalId });
+      dispatch({ type: 'SET_LOADING', payload: true });
+      await axios.delete(`${API_URL}/goals/${id}`);
+      dispatch({ type: 'DELETE_GOAL', payload: id });
     } catch (error) {
-      let errorMessage = 'Failed to delete goal';
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      throw new Error(errorMessage);
+      console.error('Delete goal error:', error);
+      dispatch({ type: 'SET_ERROR', payload: 'Error deleting goal' });
+      throw error;
     }
   };
 
-  // Complete a goal
-  const completeGoal = async (goalId: string) => {
-    return updateGoal(goalId, { completed: true });
-  };
-
-  // Add a milestone
-  const addMilestone = async (goalId: string, milestoneData: Omit<Milestone, 'id' | 'completed'>) => {
-    if (!user) throw new Error('User must be authenticated');
-
+  // Add a milestone to a goal
+  const addMilestone = async (goalId: string, milestone: any): Promise<any> => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      const milestoneId = `milestone-${Date.now()}`;
-
-      const newMilestone: Milestone = {
-        ...milestoneData,
-        id: milestoneId,
-        completed: false,
+      dispatch({ type: 'SET_LOADING', payload: true });
+      const res = await axios.post(`${API_URL}/goals/${goalId}/milestones`, milestone);
+      
+      // Transform backend format to frontend format
+      const transformedMilestone = {
+        id: res.data._id,
+        title: res.data.title,
+        description: res.data.description,
+        completed: res.data.completed,
+        imageUri: res.data.imageUri,
+        isMilestone: res.data.isMilestone,
+        createdAt: res.data.createdAt
       };
-
+      
       dispatch({
-        type: 'ADD_MILESTONE_SUCCESS',
-        payload: { goalId, milestone: newMilestone },
+        type: 'ADD_MILESTONE',
+        payload: { goalId, milestone: transformedMilestone }
       });
-
-      return milestoneId;
+      
+      return transformedMilestone;
     } catch (error) {
-      let errorMessage = 'Failed to add milestone';
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      throw new Error(errorMessage);
+      console.error('Add milestone error:', error);
+      dispatch({ type: 'SET_ERROR', payload: 'Error adding milestone' });
+      throw error;
     }
   };
 
   // Update a milestone
-  const updateMilestone = async (
-    goalId: string,
-    milestoneId: string,
-    milestoneData: Partial<Milestone>
-  ) => {
-    if (!user) throw new Error('User must be authenticated');
-
+  const updateMilestone = async (goalId: string, milestoneId: string, milestone: any): Promise<any> => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 300));
-
+      dispatch({ type: 'SET_LOADING', payload: true });
+      const res = await axios.put(`${API_URL}/goals/${goalId}/milestones/${milestoneId}`, milestone);
+      
+      // Transform backend format to frontend format
+      const transformedMilestone = {
+        id: res.data._id,
+        title: res.data.title,
+        description: res.data.description,
+        completed: res.data.completed,
+        imageUri: res.data.imageUri,
+        isMilestone: res.data.isMilestone,
+        createdAt: res.data.createdAt
+      };
+      
       dispatch({
-        type: 'UPDATE_MILESTONE_SUCCESS',
-        payload: { goalId, milestoneId, data: milestoneData },
+        type: 'UPDATE_MILESTONE',
+        payload: { goalId, milestoneId, milestone: transformedMilestone }
       });
+      
+      return transformedMilestone;
     } catch (error) {
-      let errorMessage = 'Failed to update milestone';
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      throw new Error(errorMessage);
+      console.error('Update milestone error:', error);
+      dispatch({ type: 'SET_ERROR', payload: 'Error updating milestone' });
+      throw error;
     }
   };
 
   // Delete a milestone
-  const deleteMilestone = async (goalId: string, milestoneId: string) => {
-    if (!user) throw new Error('User must be authenticated');
-
+  const deleteMilestone = async (goalId: string, milestoneId: string): Promise<void> => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 300));
-
+      dispatch({ type: 'SET_LOADING', payload: true });
+      await axios.delete(`${API_URL}/goals/${goalId}/milestones/${milestoneId}`);
       dispatch({
-        type: 'DELETE_MILESTONE_SUCCESS',
-        payload: { goalId, milestoneId },
+        type: 'DELETE_MILESTONE',
+        payload: { goalId, milestoneId }
       });
     } catch (error) {
-      let errorMessage = 'Failed to delete milestone';
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      throw new Error(errorMessage);
+      console.error('Delete milestone error:', error);
+      dispatch({ type: 'SET_ERROR', payload: 'Error deleting milestone' });
+      throw error;
     }
   };
 
-  // Complete or uncomplete a milestone
-  const completeMilestone = async (
-    goalId: string,
-    milestoneId: string,
-    isCompleted: boolean
-  ) => {
-    return updateMilestone(goalId, milestoneId, { completed: isCompleted });
+  // Toggle milestone completion
+  const toggleMilestoneCompletion = async (goalId: string, milestoneId: string, isCompleted: boolean): Promise<any> => {
+    try {
+      return updateMilestone(goalId, milestoneId, { completed: isCompleted });
+    } catch (error) {
+      console.error('Toggle milestone completion error:', error);
+      throw error;
+    }
   };
 
   return (
     <GoalContext.Provider
       value={{
-        goalState,
-        fetchGoals,
+        goalState: state,
+        getGoals,
+        getGoal,
         addGoal,
         updateGoal,
         deleteGoal,
-        completeGoal,
         addMilestone,
         updateMilestone,
         deleteMilestone,
-        completeMilestone,
+        toggleMilestoneCompletion
       }}
     >
       {children}

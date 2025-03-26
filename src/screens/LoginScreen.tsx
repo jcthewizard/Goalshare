@@ -5,6 +5,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { StackScreenProps } from '@react-navigation/stack';
 import { AuthStackParamList } from '../navigation';
 
+// Import the NetworkDebug utility
+import NetworkDebug from '../utils/NetworkDebug';
+
 type Props = StackScreenProps<AuthStackParamList, 'Login'>;
 
 const LoginScreen: React.FC<Props> = ({ navigation }) => {
@@ -12,7 +15,32 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [registerLoading, setRegisterLoading] = useState(false);
+  const [diagnosing, setDiagnosing] = useState(false);
   const { login, loginDev, register } = useAuth();
+
+  // Add network diagnostic function
+  const runNetworkDiagnostics = async () => {
+    setDiagnosing(true);
+    
+    try {
+      Alert.alert('Network Diagnostics', 'Running network tests... Check console logs for results.');
+      
+      // Get API URL from the same place the auth context does
+      // This is a bit of a hack - in a real app you'd use a config system that both can access
+      const API_BASE = `http://${process.env.IP}:5001/api`;
+
+      
+      // Run full diagnostics
+      await NetworkDebug.runFullDiagnostics(API_BASE + '/api/health');
+      
+      Alert.alert('Diagnostics Complete', 'Network diagnostics completed. Check console logs for detailed results.');
+    } catch (error) {
+      console.error('Diagnostic error:', error);
+      Alert.alert('Diagnostic Error', 'An error occurred during network diagnostics.');
+    } finally {
+      setDiagnosing(false);
+    }
+  };
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -21,12 +49,13 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
     }
 
     setLoading(true);
+    console.log('🔄 UI: Login attempt started with email:', email);
 
     try {
       await login(email, password);
-      console.log('Login successful');
+      console.log('✅ UI: Login successful');
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('❌ UI: Login error:', error);
       Alert.alert('Login Failed', error instanceof Error ? error.message : 'An error occurred');
     } finally {
       setLoading(false);
@@ -54,6 +83,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const handleDevLogin = () => {
+    console.log('🔄 UI: Using dev login bypass');
     loginDev();
   };
 
@@ -117,7 +147,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
 
         <Divider style={styles.divider} />
 
-        <Text style={styles.devText}>Development Options:</Text>
+        <Text style={styles.devText}>Development Options (Use these while MongoDB is unavailable):</Text>
 
         <Button
           mode="outlined"
@@ -129,12 +159,25 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
         </Button>
 
         <Button
-          mode="outlined"
+          mode="contained"
           onPress={handleDevLogin}
-          style={styles.devButton}
+          style={[styles.devButton, { backgroundColor: '#4CAF50' }]}
+          labelStyle={{ color: 'white' }}
           disabled={loading || registerLoading}
         >
-          Direct Login (No Firebase)
+          Use Direct Login (Bypass Backend)
+        </Button>
+        
+        <Divider style={[styles.divider, { marginTop: 16 }]} />
+        
+        <Button
+          mode="outlined"
+          onPress={runNetworkDiagnostics}
+          loading={diagnosing}
+          disabled={diagnosing}
+          style={[styles.devButton, { borderColor: '#2196F3' }]}
+        >
+          Run Network Diagnostics
         </Button>
       </Surface>
     </View>

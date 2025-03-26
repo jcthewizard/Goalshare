@@ -33,7 +33,7 @@ type Props = StackScreenProps<RootStackParamList, 'GoalDetail'>;
 
 const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.ReactElement => {
   const { goalId } = route.params;
-  const { goalState, fetchGoals, completeMilestone } = useGoals();
+  const { goalState, getGoals, toggleMilestoneCompletion } = useGoals();
   const { user } = useAuth();
   const [goal, setGoal] = useState(goalState.goals.find((g) => g.id === goalId) || null);
   const [animatedValues, setAnimatedValues] = useState<{[key: string]: Animated.Value}>({});
@@ -99,7 +99,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
   // Use this effect only once to fetch goals if needed
   useEffect(() => {
     if (goalState.goals.length === 0) {
-      fetchGoals();
+      getGoals();
     }
   }, []); // Empty dependency array so it only runs once
 
@@ -174,6 +174,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
 
   const handleCompleteMilestone = (milestoneId: string, isCompleted: boolean): void => {
     if (!goal) return;
+    console.log(`Completing milestone ${milestoneId}, current completed status: ${isCompleted}`);
 
     if (!isCompleted) {
       // Find the step being completed
@@ -233,7 +234,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
         setStepBeingCompleted(null);
 
         // Actually update the milestone state
-        completeMilestone(goal.id, milestoneId, true);
+        toggleMilestoneCompletion(goal.id, milestoneId, true);
 
         // Add to feed as a social update
         const milestone = goal.milestones.find(m => m.id === milestoneId);
@@ -263,7 +264,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
       });
     } else {
       // Simply uncomplete the milestone
-      completeMilestone(goal.id, milestoneId, false);
+      toggleMilestoneCompletion(goal.id, milestoneId, false);
     }
   };
 

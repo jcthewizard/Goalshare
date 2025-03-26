@@ -1,38 +1,39 @@
 // User types
-export type User = {
+export interface User {
   uid: string;
   email: string;
-  displayName: string;
+  displayName: string | null;
   photoURL: string | null;
-};
+}
 
-export type AuthState = {
+export interface AuthState {
   user: User | null;
   loading: boolean;
   error: string | null;
   initialized: boolean;
-};
+  token: string | null;
+}
 
 // Goal types
-export type Milestone = {
+export interface Milestone {
   id: string;
   title: string;
-  description: string;
+  description?: string;
   completed: boolean;
   imageUri?: string;
   isMilestone?: boolean;
-};
+  createdAt: string | Date;
+}
 
-export type Goal = {
+export interface Goal {
   id: string;
-  userId: string;
   title: string;
-  targetDate: Date | null;
-  isPinned: boolean;
-  createdAt: Date;
-  completed: boolean;
+  targetDate?: string | Date | null;
+  isPinned?: boolean;
+  completed?: boolean;
   milestones: Milestone[];
-};
+  createdAt: string | Date;
+}
 
 export type GoalState = {
   goals: Goal[];
