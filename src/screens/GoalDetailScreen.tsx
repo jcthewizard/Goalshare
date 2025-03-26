@@ -153,7 +153,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
   useEffect(() => {
     if (goal) {
       const incomplete = goal.milestones.filter(m => !m.completed);
-      const completed = goal.milestones.filter(m => m.completed);
+      const completed = goal.milestones.filter(m => m.completed).reverse(); // Reverse to show newest at top
       setStepsToComplete(incomplete);
       setCompletedSteps(completed);
     }
@@ -687,8 +687,8 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                                   }
                                 ]}
                               >
-                                {/* Timeline connector */}
-                                {index > 0 && (
+                                {/* Timeline connector - show only if not the last item */}
+                                {index < completedSteps.length - 1 && (
                                   <View style={styles.timelineConnector} />
                                 )}
 
