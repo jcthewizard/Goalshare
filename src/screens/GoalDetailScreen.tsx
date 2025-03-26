@@ -24,7 +24,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome5 } from '@expo/vector-icons';
 import DraggableFlatList from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { FlingGestureHandler, Directions, State } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SCROLL_THRESHOLD = 400; // The scroll distance where opacity transition completes
@@ -350,19 +350,54 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
     setCurrentPage(pageIndex);
   };
 
-  // Handle fling left (to go to timeline page)
-  const handleFlingLeft = (event) => {
-    if (event.nativeEvent.state === State.END && currentPage === 0) {
-      navigateToPage(1);
-    }
-  };
+  // Create a pan gesture handler for swiping between pages
+  const panGesture = Gesture.Pan()
+    .runOnJS(true)  // Add this to ensure the callbacks run on the JS thread
+    .onUpdate((e) => {
+      // During active gesture, directly follow finger position
+      const dragX = e.translationX;
 
-  // Handle fling right (to go back to steps page)
-  const handleFlingRight = (event) => {
-    if (event.nativeEvent.state === State.END && currentPage === 1) {
-      navigateToPage(0);
-    }
-  };
+      // Calculate the new position, constrained to prevent dragging beyond page boundaries
+      let newPosition = currentPage === 0 ?
+        Math.max(-SCREEN_WIDTH, Math.min(0, dragX)) : // If on first page, can only drag left (negative)
+        Math.max(-SCREEN_WIDTH, Math.min(0, -SCREEN_WIDTH + dragX)); // If on second page, can only drag right (positive)
+
+      // Update the position in real-time
+      pageTranslateX.setValue(newPosition);
+    })
+    .onEnd((e) => {
+      // When gesture ends, decide whether to snap to next page or return to current
+      const dragX = e.translationX;
+      const dragVelocity = e.velocityX;
+
+      // Determine threshold - either we've dragged more than halfway, or with sufficient velocity
+      const hasMovedOverThreshold = Math.abs(dragX) > SCREEN_WIDTH / 3;
+      const hasMovedWithVelocity = Math.abs(dragVelocity) > 100;
+
+      let targetPage = currentPage;
+
+      if (currentPage === 0) {
+        // If on first page and dragged left significantly, move to next page
+        if ((dragX < 0 && hasMovedOverThreshold) || (dragX < 0 && hasMovedWithVelocity)) {
+          targetPage = 1;
+        }
+      } else {
+        // If on second page and dragged right significantly, move to previous page
+        if ((dragX > 0 && hasMovedOverThreshold) || (dragX > 0 && hasMovedWithVelocity)) {
+          targetPage = 0;
+        }
+      }
+
+      // Animate to the target page
+      Animated.spring(pageTranslateX, {
+        toValue: targetPage === 0 ? 0 : -SCREEN_WIDTH,
+        tension: 70,
+        friction: 12,
+        useNativeDriver: true
+      }).start();
+
+      setCurrentPage(targetPage);
+    });
 
   if (!goal) {
     return (
@@ -522,330 +557,322 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
 
       {/* Swipeable Content Container */}
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <FlingGestureHandler
-          direction={Directions.LEFT}
-          onHandlerStateChange={handleFlingLeft}
-        >
-          <FlingGestureHandler
-            direction={Directions.RIGHT}
-            onHandlerStateChange={handleFlingRight}
-          >
-            <View style={{ flex: 1 }}>
-              <Animated.View style={[styles.pagesContainer, {
-                transform: [{ translateX: pageTranslateX }]
-              }]}>
-                {/* Steps Page */}
-                <View style={styles.page}>
-                  <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                    <View style={styles.stepsSection}>
-                      <Text style={styles.sectionTitle}>Steps to Complete</Text>
-                      {stepsToComplete.length === 0 ? (
-                        <View>
-                          <Text style={styles.emptyStateText}>All steps completed! 🎉</Text>
+        <GestureDetector gesture={panGesture}>
+          <Animated.View style={{ flex: 1 }}>
+            <Animated.View style={[styles.pagesContainer, {
+              transform: [{ translateX: pageTranslateX }]
+            }]}>
+              {/* Steps Page */}
+              <View style={styles.page}>
+                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                  <View style={styles.stepsSection}>
+                    <Text style={styles.sectionTitle}>Steps to Complete</Text>
+                    {stepsToComplete.length === 0 ? (
+                      <View>
+                        <Text style={styles.emptyStateText}>All steps completed! 🎉</Text>
+                        <TouchableOpacity
+                          style={styles.addStepButton}
+                          onPress={() => navigation.navigate('AddMilestone', { goalId: goal.id })}
+                        >
+                          <LinearGradient
+                            colors={[themeColors.primary, themeColors.secondary]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.addStepButtonGradient}
+                          >
+                            <Text style={styles.addStepButtonText}>Add New Step</Text>
+                            <FontAwesome5 name="plus" size={16} color="#FFF" />
+                          </LinearGradient>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <GestureHandlerRootView style={{ flex: 1, width: '100%' }}>
+                        <View style={styles.stepsListContainer}>
+                          <DraggableFlatList
+                            data={stepsToComplete}
+                            keyExtractor={item => item.id}
+                            onDragEnd={handleDragEnd}
+                            contentContainerStyle={styles.draggableListContent}
+                            renderItem={({ item, drag, isActive }) => {
+                              const isBeingCompleted = stepBeingCompleted?.id === item.id;
+
+                              return (
+                                <Animated.View style={[
+                                  styles.fullWidth,
+                                  isBeingCompleted ? {
+                                    zIndex: 1000,
+                                    opacity: stepOpacity,
+                                    transform: [
+                                      { translateY: stepTranslateY },
+                                      { translateX: stepTranslateX },
+                                      { scale: stepScale }
+                                    ]
+                                  } : null
+                                ]}>
+                                  <TouchableOpacity
+                                    onLongPress={drag}
+                                    delayLongPress={150}
+                                    style={[
+                                      styles.stepCard,
+                                      isActive && styles.stepCardActive
+                                    ]}
+                                    disabled={isBeingCompleted}
+                                  >
+                                    <Card style={styles.fullWidth} elevation={isActive ? 4 : 2}>
+                                      {item.isMilestone && (
+                                        <LinearGradient
+                                          colors={[`${themeColors.accent}20`, '#FFFCF3']}
+                                          start={{ x: 0, y: 0 }}
+                                          end={{ x: 1, y: 0 }}
+                                          style={styles.milestoneCardGradient}
+                                        />
+                                      )}
+                                      <Card.Content style={styles.stepCardContent}>
+                                        <View style={styles.stepHeader}>
+                                          <View style={styles.dragHandle}>
+                                            <FontAwesome5 name="grip-lines" size={14} color="#aaa" />
+                                          </View>
+                                          <Title style={styles.stepTitle}>{item.title}</Title>
+                                          <TouchableOpacity
+                                            style={[
+                                              styles.checkboxContainer,
+                                              item.isMilestone && [styles.milestoneCheckboxContainer, { borderColor: themeColors.accent }]
+                                            ]}
+                                            onPress={() => handleCompleteMilestone(item.id, item.completed)}
+                                          >
+                                            {item.isMilestone && (
+                                              <FontAwesome5 name="star" size={10} color={themeColors.accent} style={styles.milestoneIcon} />
+                                            )}
+                                            <FontAwesome5 name="check" size={14} color="transparent" />
+                                          </TouchableOpacity>
+                                        </View>
+
+                                        {item.description && (
+                                          <Paragraph style={styles.stepDescription}>
+                                            {item.description}
+                                          </Paragraph>
+                                        )}
+
+                                        {item.imageUri && (
+                                          <View style={styles.imageContainer}>
+                                            <Image
+                                              source={{ uri: item.imageUri }}
+                                              style={styles.stepImage}
+                                            />
+                                          </View>
+                                        )}
+                                      </Card.Content>
+                                    </Card>
+                                  </TouchableOpacity>
+                                </Animated.View>
+                              );
+                            }}
+                          />
                           <TouchableOpacity
-                            style={styles.addStepButton}
+                            style={styles.addStepFAB}
                             onPress={() => navigation.navigate('AddMilestone', { goalId: goal.id })}
                           >
                             <LinearGradient
                               colors={[themeColors.primary, themeColors.secondary]}
                               start={{ x: 0, y: 0 }}
                               end={{ x: 1, y: 1 }}
-                              style={styles.addStepButtonGradient}
+                              style={styles.addStepFABGradient}
                             >
-                              <Text style={styles.addStepButtonText}>Add New Step</Text>
-                              <FontAwesome5 name="plus" size={16} color="#FFF" />
+                              <FontAwesome5 name="plus" size={20} color="#FFF" />
                             </LinearGradient>
                           </TouchableOpacity>
                         </View>
-                      ) : (
-                        <GestureHandlerRootView style={{ flex: 1, width: '100%' }}>
-                          <View style={styles.stepsListContainer}>
-                            <DraggableFlatList
-                              data={stepsToComplete}
-                              keyExtractor={item => item.id}
-                              onDragEnd={handleDragEnd}
-                              contentContainerStyle={styles.draggableListContent}
-                              renderItem={({ item, drag, isActive }) => {
-                                const isBeingCompleted = stepBeingCompleted?.id === item.id;
+                      </GestureHandlerRootView>
+                    )}
+                  </View>
+                </ScrollView>
+              </View>
 
-                                return (
-                                  <Animated.View style={[
-                                    styles.fullWidth,
-                                    isBeingCompleted ? {
-                                      zIndex: 1000,
-                                      opacity: stepOpacity,
-                                      transform: [
-                                        { translateY: stepTranslateY },
-                                        { translateX: stepTranslateX },
-                                        { scale: stepScale }
-                                      ]
-                                    } : null
-                                  ]}>
-                                    <TouchableOpacity
-                                      onLongPress={drag}
-                                      delayLongPress={150}
-                                      style={[
-                                        styles.stepCard,
-                                        isActive && styles.stepCardActive
-                                      ]}
-                                      disabled={isBeingCompleted}
-                                    >
-                                      <Card style={styles.fullWidth} elevation={isActive ? 4 : 2}>
-                                        {item.isMilestone && (
-                                          <LinearGradient
-                                            colors={[`${themeColors.accent}20`, '#FFFCF3']}
-                                            start={{ x: 0, y: 0 }}
-                                            end={{ x: 1, y: 0 }}
-                                            style={styles.milestoneCardGradient}
-                                          />
-                                        )}
-                                        <Card.Content style={styles.stepCardContent}>
-                                          <View style={styles.stepHeader}>
-                                            <View style={styles.dragHandle}>
-                                              <FontAwesome5 name="grip-lines" size={14} color="#aaa" />
-                                            </View>
-                                            <Title style={styles.stepTitle}>{item.title}</Title>
-                                            <TouchableOpacity
-                                              style={[
-                                                styles.checkboxContainer,
-                                                item.isMilestone && [styles.milestoneCheckboxContainer, { borderColor: themeColors.accent }]
-                                              ]}
-                                              onPress={() => handleCompleteMilestone(item.id, item.completed)}
-                                            >
-                                              {item.isMilestone && (
-                                                <FontAwesome5 name="star" size={10} color={themeColors.accent} style={styles.milestoneIcon} />
-                                              )}
-                                              <FontAwesome5 name="check" size={14} color="transparent" />
-                                            </TouchableOpacity>
-                                          </View>
+              {/* Timeline Page */}
+              <View style={styles.page}>
+                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                  <View style={styles.timelineSection}>
+                    <Text style={[styles.sectionTitle, { marginTop: 0 }]}>Timeline</Text>
 
-                                          {item.description && (
-                                            <Paragraph style={styles.stepDescription}>
-                                              {item.description}
-                                            </Paragraph>
-                                          )}
+                    {completedSteps.length === 0 ? (
+                      <Text style={styles.emptyStateText}>Complete steps to see your progress here</Text>
+                    ) : (
+                      <View style={styles.timelineContainer}>
+                        {completedSteps.map((milestone, index) => {
+                          // Get pre-created animation values for this milestone
+                          const animations = milestoneAnimRefs.current[milestone.id] || {
+                            fade: new Animated.Value(1),
+                            translateY: new Animated.Value(0)
+                          };
 
-                                          {item.imageUri && (
-                                            <View style={styles.imageContainer}>
-                                              <Image
-                                                source={{ uri: item.imageUri }}
-                                                style={styles.stepImage}
-                                              />
-                                            </View>
-                                          )}
-                                        </Card.Content>
-                                      </Card>
-                                    </TouchableOpacity>
-                                  </Animated.View>
-                                );
-                              }}
-                            />
-                            <TouchableOpacity
-                              style={styles.addStepFAB}
-                              onPress={() => navigation.navigate('AddMilestone', { goalId: goal.id })}
+                          return (
+                            <Animated.View key={milestone.id}
+                              style={[
+                                styles.timelineItem,
+                                {
+                                  opacity: animations.fade,
+                                  transform: [{ translateY: animations.translateY }]
+                                }
+                              ]}
                             >
-                              <LinearGradient
-                                colors={[themeColors.primary, themeColors.secondary]}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={styles.addStepFABGradient}
-                              >
-                                <FontAwesome5 name="plus" size={20} color="#FFF" />
-                              </LinearGradient>
-                            </TouchableOpacity>
-                          </View>
-                        </GestureHandlerRootView>
-                      )}
-                    </View>
-                  </ScrollView>
-                </View>
+                              {/* Timeline connector - show only if not the last item */}
+                              {index < completedSteps.length - 1 && (
+                                <View style={styles.timelineConnector} />
+                              )}
 
-                {/* Timeline Page */}
-                <View style={styles.page}>
-                  <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                    <View style={styles.timelineSection}>
-                      <Text style={[styles.sectionTitle, { marginTop: 0 }]}>Timeline</Text>
-
-                      {completedSteps.length === 0 ? (
-                        <Text style={styles.emptyStateText}>Complete steps to see your progress here</Text>
-                      ) : (
-                        <View style={styles.timelineContainer}>
-                          {completedSteps.map((milestone, index) => {
-                            // Get pre-created animation values for this milestone
-                            const animations = milestoneAnimRefs.current[milestone.id] || {
-                              fade: new Animated.Value(1),
-                              translateY: new Animated.Value(0)
-                            };
-
-                            return (
-                              <Animated.View key={milestone.id}
-                                style={[
-                                  styles.timelineItem,
-                                  {
-                                    opacity: animations.fade,
-                                    transform: [{ translateY: animations.translateY }]
-                                  }
-                                ]}
-                              >
-                                {/* Timeline connector - show only if not the last item */}
-                                {index < completedSteps.length - 1 && (
-                                  <View style={styles.timelineConnector} />
+                              {/* Milestone node */}
+                              <Animated.View style={[
+                                styles.timelineNode,
+                                milestone.isMilestone && styles.milestoneTimelineNode,
+                                {
+                                  backgroundColor: milestone.isMilestone ? themeColors.accent : themeColors.primary
+                                }
+                              ]}>
+                                {milestone.isMilestone && (
+                                  <Animated.View style={[
+                                    styles.shimmerOverlay,
+                                    {
+                                      opacity: shimmerAnim.interpolate({
+                                        inputRange: [0, 0.5, 1],
+                                        outputRange: [0.1, 0.3, 0.1]
+                                      })
+                                    }
+                                  ]} />
                                 )}
+                                {milestone.isMilestone ? (
+                                  <FontAwesome5 name="star" size={16} color={themeColors.accent} />
+                                ) : (
+                                  <FontAwesome5 name="check" size={14} color="#FFF" />
+                                )}
+                              </Animated.View>
 
-                                {/* Milestone node */}
-                                <Animated.View style={[
-                                  styles.timelineNode,
-                                  milestone.isMilestone && styles.milestoneTimelineNode,
-                                  {
-                                    backgroundColor: milestone.isMilestone ? themeColors.accent : themeColors.primary
-                                  }
-                                ]}>
-                                  {milestone.isMilestone && (
-                                    <Animated.View style={[
-                                      styles.shimmerOverlay,
-                                      {
-                                        opacity: shimmerAnim.interpolate({
-                                          inputRange: [0, 0.5, 1],
-                                          outputRange: [0.1, 0.3, 0.1]
-                                        })
-                                      }
-                                    ]} />
-                                  )}
-                                  {milestone.isMilestone ? (
-                                    <FontAwesome5 name="star" size={16} color={themeColors.accent} />
-                                  ) : (
-                                    <FontAwesome5 name="check" size={14} color="#FFF" />
-                                  )}
-                                </Animated.View>
-
-                                {/* Milestone content */}
-                                <Card style={[
-                                  styles.milestoneCard,
-                                  milestone.isMilestone && [
-                                    styles.milestoneTimelineCard,
-                                    { borderLeftColor: themeColors.accent }
-                                  ]
-                                ]}>
-                                  {milestone.isMilestone && (
-                                    <>
+                              {/* Milestone content */}
+                              <Card style={[
+                                styles.milestoneCard,
+                                milestone.isMilestone && [
+                                  styles.milestoneTimelineCard,
+                                  { borderLeftColor: themeColors.accent }
+                                ]
+                              ]}>
+                                {milestone.isMilestone && (
+                                  <>
+                                    <LinearGradient
+                                      colors={[`${themeColors.accent}20`, '#FFFCF3']}
+                                      start={{ x: 0, y: 0 }}
+                                      end={{ x: 1, y: 0 }}
+                                      style={styles.milestoneCardGradient}
+                                    />
+                                    <Animated.View
+                                      style={[
+                                        styles.milestoneFireBorder,
+                                        { transform: [{ scale: pulseAnim }] }
+                                      ]}
+                                    >
                                       <LinearGradient
-                                        colors={[`${themeColors.accent}20`, '#FFFCF3']}
+                                        colors={[themeColors.primary, themeColors.secondary, themeColors.accent]}
                                         start={{ x: 0, y: 0 }}
-                                        end={{ x: 1, y: 0 }}
-                                        style={styles.milestoneCardGradient}
+                                        end={{ x: 0, y: 1 }}
+                                        style={styles.fireGradient}
                                       />
-                                      <Animated.View
-                                        style={[
-                                          styles.milestoneFireBorder,
-                                          { transform: [{ scale: pulseAnim }] }
-                                        ]}
-                                      >
-                                        <LinearGradient
-                                          colors={[themeColors.primary, themeColors.secondary, themeColors.accent]}
-                                          start={{ x: 0, y: 0 }}
-                                          end={{ x: 0, y: 1 }}
-                                          style={styles.fireGradient}
-                                        />
+                                    </Animated.View>
+
+                                    {/* Sparkle effects for milestone */}
+                                    <View style={styles.sparkleContainer}>
+                                      <Animated.View style={[
+                                        styles.sparkle,
+                                        styles.sparkleTopRight,
+                                        {
+                                          opacity: shimmerAnim.interpolate({
+                                            inputRange: [0, 0.3, 0.6, 1],
+                                            outputRange: [0, 1, 0.5, 0]
+                                          }),
+                                          transform: [{
+                                            scale: shimmerAnim.interpolate({
+                                              inputRange: [0, 0.5, 1],
+                                              outputRange: [0.7, 1.2, 0.7]
+                                            })
+                                          }]
+                                        }
+                                      ]}>
+                                        <FontAwesome5 name="sparkles" size={16} color={themeColors.accent} />
                                       </Animated.View>
 
-                                      {/* Sparkle effects for milestone */}
-                                      <View style={styles.sparkleContainer}>
-                                        <Animated.View style={[
-                                          styles.sparkle,
-                                          styles.sparkleTopRight,
-                                          {
-                                            opacity: shimmerAnim.interpolate({
-                                              inputRange: [0, 0.3, 0.6, 1],
-                                              outputRange: [0, 1, 0.5, 0]
-                                            }),
-                                            transform: [{
-                                              scale: shimmerAnim.interpolate({
-                                                inputRange: [0, 0.5, 1],
-                                                outputRange: [0.7, 1.2, 0.7]
-                                              })
-                                            }]
-                                          }
-                                        ]}>
-                                          <FontAwesome5 name="sparkles" size={16} color={themeColors.accent} />
-                                        </Animated.View>
-
-                                        <Animated.View style={[
-                                          styles.sparkle,
-                                          styles.sparkleBottomLeft,
-                                          {
-                                            opacity: shimmerAnim.interpolate({
-                                              inputRange: [0, 0.5, 0.8, 1],
-                                              outputRange: [0, 0.5, 1, 0]
-                                            }),
-                                            transform: [{
-                                              scale: shimmerAnim.interpolate({
-                                                inputRange: [0, 0.5, 1],
-                                                outputRange: [0.8, 1.1, 0.8]
-                                              })
-                                            }]
-                                          }
-                                        ]}>
-                                          <FontAwesome5 name="star" size={12} color={themeColors.accent} />
-                                        </Animated.View>
-                                      </View>
-                                    </>
-                                  )}
-                                  <Card.Content>
-                                    <View style={styles.milestoneHeader}>
-                                      <Title style={[
-                                        styles.milestoneTitle,
-                                        milestone.isMilestone && { color: themeColors.accent }
+                                      <Animated.View style={[
+                                        styles.sparkle,
+                                        styles.sparkleBottomLeft,
+                                        {
+                                          opacity: shimmerAnim.interpolate({
+                                            inputRange: [0, 0.5, 0.8, 1],
+                                            outputRange: [0, 0.5, 1, 0]
+                                          }),
+                                          transform: [{
+                                            scale: shimmerAnim.interpolate({
+                                              inputRange: [0, 0.5, 1],
+                                              outputRange: [0.8, 1.1, 0.8]
+                                            })
+                                          }]
+                                        }
                                       ]}>
-                                        {milestone.title}
-                                      </Title>
-                                      <TouchableOpacity
-                                        style={[styles.checkboxContainer, styles.checkboxCompleted]}
-                                        onPress={() => handleCompleteMilestone(milestone.id, milestone.completed)}
-                                      >
-                                        <FontAwesome5 name="check" size={14} color="#FFF" />
-                                      </TouchableOpacity>
+                                        <FontAwesome5 name="star" size={12} color={themeColors.accent} />
+                                      </Animated.View>
                                     </View>
+                                  </>
+                                )}
+                                <Card.Content>
+                                  <View style={styles.milestoneHeader}>
+                                    <Title style={[
+                                      styles.milestoneTitle,
+                                      milestone.isMilestone && { color: themeColors.accent }
+                                    ]}>
+                                      {milestone.title}
+                                    </Title>
+                                    <TouchableOpacity
+                                      style={[styles.checkboxContainer, styles.checkboxCompleted]}
+                                      onPress={() => handleCompleteMilestone(milestone.id, milestone.completed)}
+                                    >
+                                      <FontAwesome5 name="check" size={14} color="#FFF" />
+                                    </TouchableOpacity>
+                                  </View>
 
-                                    {milestone.description && (
-                                      <Paragraph style={styles.milestoneDescription}>
-                                        {milestone.description}
-                                      </Paragraph>
-                                    )}
+                                  {milestone.description && (
+                                    <Paragraph style={styles.milestoneDescription}>
+                                      {milestone.description}
+                                    </Paragraph>
+                                  )}
 
-                                    {/* Display milestone image if available */}
-                                    {milestone.imageUri && (
-                                      <View style={styles.imageContainer}>
-                                        <Image
-                                          source={{ uri: milestone.imageUri }}
-                                          style={styles.milestoneImage}
-                                        />
-                                      </View>
-                                    )}
+                                  {/* Display milestone image if available */}
+                                  {milestone.imageUri && (
+                                    <View style={styles.imageContainer}>
+                                      <Image
+                                        source={{ uri: milestone.imageUri }}
+                                        style={styles.milestoneImage}
+                                      />
+                                    </View>
+                                  )}
 
-                                    {/* Completion date could be added here */}
-                                    <Text style={styles.completedDate}>
-                                      Completed {format(new Date(), 'MMM d, yyyy')}
-                                    </Text>
-                                  </Card.Content>
-                                </Card>
-                              </Animated.View>
-                            );
-                          })}
-                        </View>
-                      )}
-                    </View>
-                  </ScrollView>
-                </View>
-              </Animated.View>
-
-              {/* Page indicator dots - moved to bottom */}
-              <View style={styles.pageDotsContainer}>
-                <View style={[styles.pageDot, currentPage === 0 && styles.activePageDot, { backgroundColor: currentPage === 0 ? themeColors.primary : '#e0e0e0' }]} />
-                <View style={[styles.pageDot, currentPage === 1 && styles.activePageDot, { backgroundColor: currentPage === 1 ? themeColors.primary : '#e0e0e0' }]} />
+                                  {/* Completion date could be added here */}
+                                  <Text style={styles.completedDate}>
+                                    Completed {format(new Date(), 'MMM d, yyyy')}
+                                  </Text>
+                                </Card.Content>
+                              </Card>
+                            </Animated.View>
+                          );
+                        })}
+                      </View>
+                    )}
+                  </View>
+                </ScrollView>
               </View>
+            </Animated.View>
+
+            {/* Page indicator dots */}
+            <View style={styles.pageDotsContainer}>
+              <View style={[styles.pageDot, currentPage === 0 && styles.activePageDot, { backgroundColor: currentPage === 0 ? themeColors.primary : '#e0e0e0' }]} />
+              <View style={[styles.pageDot, currentPage === 1 && styles.activePageDot, { backgroundColor: currentPage === 1 ? themeColors.primary : '#e0e0e0' }]} />
             </View>
-          </FlingGestureHandler>
-        </FlingGestureHandler>
+          </Animated.View>
+        </GestureDetector>
       </GestureHandlerRootView>
     </SafeAreaView>
   );
