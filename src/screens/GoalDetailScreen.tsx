@@ -22,9 +22,9 @@ import { RootStackParamList } from '../navigation';
 import { format } from 'date-fns';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome5 } from '@expo/vector-icons';
-import DraggableFlatList from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Ionicons } from '@expo/vector-icons';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SCROLL_THRESHOLD = 400; // The scroll distance where opacity transition completes
@@ -33,7 +33,7 @@ type Props = StackScreenProps<RootStackParamList, 'GoalDetail'>;
 
 const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.ReactElement => {
   const { goalId } = route.params;
-  const { goalState, getGoals, toggleMilestoneCompletion } = useGoals();
+  const { goalState, getGoals, toggleMilestoneCompletion, deleteGoal, deleteMilestone } = useGoals();
   const { user } = useAuth();
   const [goal, setGoal] = useState(goalState.goals.find((g) => g.id === goalId) || null);
   const [animatedValues, setAnimatedValues] = useState<{[key: string]: Animated.Value}>({});
@@ -141,6 +141,8 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
   const [stepsToComplete, setStepsToComplete] = useState([]);
   const [completedSteps, setCompletedSteps] = useState([]);
   const [stepBeingCompleted, setStepBeingCompleted] = useState(null);
+  const [stepAnimations, setStepAnimations] = useState<{[key: string]: Animated.Value}>({});
+  const [animatingSteps, setAnimatingSteps] = useState<Set<string>>(new Set());
   const stepTranslateY = useRef(new Animated.Value(0)).current;
   const stepTranslateX = useRef(new Animated.Value(0)).current;
   const stepScale = useRef(new Animated.Value(1)).current;
@@ -149,15 +151,76 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
   // Get social context for sharing
   const { addMilestoneCompletionUpdate } = useSocial();
 
+  // Delete handlers
+  const handleDeleteGoal = (): void => {
+    Alert.alert(
+      "Delete Goal",
+      "Are you sure you want to delete this goal? This action cannot be undone.",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteGoal(goal.id);
+              navigation.goBack();
+            } catch (error) {
+              Alert.alert("Error", "Failed to delete goal. Please try again.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleDeleteMilestone = (milestoneId: string, milestoneTitle: string): void => {
+    Alert.alert(
+      "Delete Step",
+      `Are you sure you want to delete "${milestoneTitle}"? This action cannot be undone.`,
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteMilestone(goal.id, milestoneId);
+            } catch (error) {
+              Alert.alert("Error", "Failed to delete step. Please try again.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
   // Update steps when goal changes
   useEffect(() => {
     if (goal) {
-      const incomplete = goal.milestones.filter(m => !m.completed);
-      const completed = goal.milestones.filter(m => m.completed).reverse(); // Reverse to show newest at top
+      const incomplete = goal.milestones.filter(m => !m.completed || animatingSteps.has(m.id));
+      const completed = goal.milestones.filter(m => m.completed && !animatingSteps.has(m.id)).reverse(); // Reverse to show newest at top
       setStepsToComplete(incomplete);
       setCompletedSteps(completed);
+      
+      // Initialize animation values for uncompleted steps
+      const newAnimations: {[key: string]: Animated.Value} = {};
+      incomplete.forEach(step => {
+        if (!stepAnimations[step.id]) {
+          newAnimations[step.id] = new Animated.Value(1); // Start fully visible
+        } else {
+          newAnimations[step.id] = stepAnimations[step.id]; // Keep existing value
+        }
+      });
+      setStepAnimations(newAnimations);
     }
-  }, [goal]);
+  }, [goal, animatingSteps]);
 
   // Calculate section opacities based on scroll position
   const stepsOpacity = scrollY.interpolate({
@@ -177,103 +240,62 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
     console.log(`Completing milestone ${milestoneId}, current completed status: ${isCompleted}`);
 
     if (!isCompleted) {
-      // Find the step being completed
-      const step = stepsToComplete.find(s => s.id === milestoneId);
-      setStepBeingCompleted(step);
+      // Add to animating steps set
+      setAnimatingSteps(prev => new Set([...prev, milestoneId]));
+      
+      // First, immediately update the milestone to show it as checked
+      toggleMilestoneCompletion(goal.id, milestoneId, true);
 
-      // Get the position of the timeline section for animation target
-      const timelineSectionY = 300; // Default value, adjust based on layout
-
-      // Animate the step moving to timeline
-      Animated.sequence([
-        // Initial feedback - pulse effect
-        Animated.timing(stepScale, {
-          toValue: 1.1,
-          duration: 200,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.cubic),
-        }),
-        // Move to timeline with a nice arc motion
-        Animated.parallel([
-          // Move down to timeline
-          Animated.timing(stepTranslateY, {
-            toValue: timelineSectionY,
-            duration: 600,
-            useNativeDriver: true,
-            easing: Easing.bezier(0.25, 0.1, 0.25, 1),
-          }),
-          // Move slightly to the side for arc effect
-          Animated.timing(stepTranslateX, {
-            toValue: -30,
-            duration: 600,
-            useNativeDriver: true,
-            easing: Easing.bezier(0.42, 0, 0.58, 1),
-          }),
-          // Scale down slightly as it moves
-          Animated.timing(stepScale, {
-            toValue: 0.8,
-            duration: 600,
-            useNativeDriver: true,
-            easing: Easing.bezier(0.42, 0, 0.58, 1),
-          }),
-          // Fade out gently at the end
-          Animated.timing(stepOpacity, {
-            toValue: 0,
-            duration: 400,
-            delay: 350, // Start fading after movement has begun
-            useNativeDriver: true,
-            easing: Easing.bezier(0.42, 0, 0.58, 1),
-          }),
-        ]),
-      ]).start(() => {
-        // Reset animation values
-        stepTranslateY.setValue(0);
-        stepTranslateX.setValue(0);
-        stepScale.setValue(1);
-        stepOpacity.setValue(1);
-        setStepBeingCompleted(null);
-
-        // Actually update the milestone state
-        toggleMilestoneCompletion(goal.id, milestoneId, true);
-
-        // Add to feed as a social update
-        const milestone = goal.milestones.find(m => m.id === milestoneId);
-        if (milestone && user) {
-          try {
-            addMilestoneCompletionUpdate({
-              goalId: goal.id,
-              goalTitle: goal.title,
-              milestoneId: milestone.id,
-              milestoneTitle: milestone.title,
-              milestoneDescription: milestone.description,
-              imageUri: milestone.imageUri
+      // Then start fade animation after a brief delay to show the checkmark
+      const animationValue = stepAnimations[milestoneId];
+      if (animationValue) {
+        setTimeout(() => {
+          Animated.parallel([
+            Animated.timing(animationValue, {
+              toValue: 0,
+              duration: 800,
+              useNativeDriver: true,
+              easing: Easing.bezier(0.4, 0.0, 0.2, 1), // Material Design standard easing
+            }),
+          ]).start(() => {
+            // Remove from animating steps set when animation completes
+            setAnimatingSteps(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(milestoneId);
+              return newSet;
             });
 
-            // REMOVE ALERT - This removes the popup
-            // Alert.alert(
-            //  "Milestone Completed!",
-            //  "Your progress has been shared with your friends.",
-            //  [{ text: "Great!" }],
-            //  { cancelable: true }
-            // );
-
-          } catch (error) {
-            console.error("Failed to share update:", error);
-          }
-        }
-      });
+            // Add to feed as a social update
+            const milestone = goal.milestones.find(m => m.id === milestoneId);
+            if (milestone && user) {
+              try {
+                addMilestoneCompletionUpdate({
+                  goalId: goal.id,
+                  goalTitle: goal.title,
+                  milestoneId: milestone.id,
+                  milestoneTitle: milestone.title,
+                  milestoneDescription: milestone.description,
+                  imageUri: milestone.imageUri
+                });
+              } catch (error) {
+                console.error("Failed to share update:", error);
+              }
+            }
+          });
+        }, 600); // Increased delay to show the checkmark longer
+      } else {
+        // Fallback if no animation value exists - just update normally
+        // (toggleMilestoneCompletion already called above)
+        setAnimatingSteps(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(milestoneId);
+          return newSet;
+        });
+      }
     } else {
-      // Simply uncomplete the milestone
+      // Simply uncomplete the milestone (no animation needed when unchecking)
       toggleMilestoneCompletion(goal.id, milestoneId, false);
     }
-  };
-
-  const handleDragEnd = ({ data }) => {
-    // Update the order of steps
-    setStepsToComplete(data);
-
-    // Here you would typically update this order in your backend
-    // For example: updateMilestoneOrder(goal.id, data.map(item => item.id));
   };
 
   // Add this after your other useRefs
@@ -421,26 +443,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
     ? Math.round((completedMilestones / totalMilestones) * 100)
     : 0;
 
-  // Fix for the Animated.multiply issue
-  const AnimatedMultiplyFix = ({ value, multiplier, children }) => {
-    // Create the multiplied value safely
-    const multValue = Animated.multiply(
-      value,
-      new Animated.Value(multiplier || 0)
-    );
 
-    const animatedStyle = {
-      transform: [{
-        translateY: multValue
-      }]
-    };
-
-    return (
-      <Animated.View style={animatedStyle}>
-        {typeof children === 'string' ? <Text>{children}</Text> : children}
-      </Animated.View>
-    );
-  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -475,6 +478,21 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
               }]
             }
           ]}>
+            {/* Delete Goal Button - now part of the animated list */}
+            <TouchableOpacity
+              style={[
+                styles.colorOption, 
+                { 
+                  backgroundColor: '#D3D3D3',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }
+              ]}
+              onPress={handleDeleteGoal}
+            >
+              <FontAwesome5 name="trash" size={14} color="red" />
+            </TouchableOpacity>
+            
             {/* Red theme */}
             <TouchableOpacity
               style={[styles.colorOption, { backgroundColor: '#FF5F5F' }]}
@@ -497,8 +515,8 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
             />
             {/* Orange theme */}
             <TouchableOpacity
-              style={[styles.colorOption, { backgroundColor: '#FF9800' }]}
-              onPress={() => changeThemeColors('#FF9800', '#FFCC80', '#FFE082')}
+              style={[styles.colorOption, { backgroundColor: '#FFA500' }]}
+              onPress={() => changeThemeColors('#4CAF50', '#81C784', '#C8E6C9')}
             />
           </Animated.View>
 
@@ -506,7 +524,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
           <TouchableOpacity
             style={[
               styles.headerActionButton,
-              showColorPicker && {backgroundColor: '#f0f0f0'}
+              showColorPicker ? {backgroundColor: '#f0f0f0'} : null
             ]}
             onPress={toggleColorPicker}
           >
@@ -561,10 +579,11 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
         <GestureDetector gesture={panGesture}>
           <Animated.View style={{ flex: 1 }}>
             <Animated.View style={[styles.pagesContainer, {
+              width: SCREEN_WIDTH * 2,
               transform: [{ translateX: pageTranslateX }]
             }]}>
               {/* Steps Page */}
-              <View style={styles.page}>
+              <View style={[styles.page, { width: SCREEN_WIDTH }]}>
                 <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                   <View style={styles.stepsSection}>
                     <Text style={styles.sectionTitle}>Steps to Complete</Text>
@@ -575,122 +594,105 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                           style={styles.addStepButton}
                           onPress={() => navigation.navigate('AddMilestone', { goalId: goal.id })}
                         >
-                          <LinearGradient
-                            colors={[themeColors.primary, themeColors.secondary]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={styles.addStepButtonGradient}
-                          >
-                            <Text style={styles.addStepButtonText}>Add New Step</Text>
-                            <FontAwesome5 name="plus" size={16} color="#FFF" />
-                          </LinearGradient>
+                          <Ionicons name="add" size={16} color="#35CAFC" />
+                          <Text style={styles.addStepText}>Add New Step</Text>
                         </TouchableOpacity>
                       </View>
                     ) : (
-                      <GestureHandlerRootView style={{ flex: 1, width: '100%' }}>
-                        <View style={styles.stepsListContainer}>
-                          <DraggableFlatList
-                            data={stepsToComplete}
-                            keyExtractor={item => item.id}
-                            onDragEnd={handleDragEnd}
-                            contentContainerStyle={styles.draggableListContent}
-                            renderItem={({ item, drag, isActive }) => {
-                              const isBeingCompleted = stepBeingCompleted?.id === item.id;
-
-                              return (
-                                <Animated.View style={[
-                                  styles.fullWidth,
-                                  isBeingCompleted ? {
-                                    zIndex: 1000,
-                                    opacity: stepOpacity,
-                                    transform: [
-                                      { translateY: stepTranslateY },
-                                      { translateX: stepTranslateX },
-                                      { scale: stepScale }
-                                    ]
-                                  } : null
-                                ]}>
-                                  <TouchableOpacity
-                                    onLongPress={drag}
-                                    delayLongPress={150}
-                                    style={[
-                                      styles.stepCard,
-                                      isActive && styles.stepCardActive
-                                    ]}
-                                    disabled={isBeingCompleted}
-                                  >
-                                    <Card style={styles.fullWidth} elevation={isActive ? 4 : 2}>
-                                      {item.isMilestone && (
-                                        <LinearGradient
-                                          colors={[`${themeColors.accent}20`, '#FFFCF3']}
-                                          start={{ x: 0, y: 0 }}
-                                          end={{ x: 1, y: 0 }}
-                                          style={styles.milestoneCardGradient}
-                                        />
-                                      )}
-                                      <Card.Content style={styles.stepCardContent}>
-                                        <View style={styles.stepHeader}>
-                                          <View style={styles.dragHandle}>
-                                            <FontAwesome5 name="grip-lines" size={14} color="#aaa" />
-                                          </View>
-                                          <Title style={styles.stepTitle}>{item.title}</Title>
-                                          <TouchableOpacity
-                                            style={[
-                                              styles.checkboxContainer,
-                                              item.isMilestone && [styles.milestoneCheckboxContainer, { borderColor: themeColors.accent }]
-                                            ]}
-                                            onPress={() => handleCompleteMilestone(item.id, item.completed)}
-                                          >
-                                            {item.isMilestone && (
-                                              <FontAwesome5 name="star" size={10} color={themeColors.accent} style={styles.milestoneIcon} />
-                                            )}
-                                            <FontAwesome5 name="check" size={14} color="transparent" />
-                                          </TouchableOpacity>
-                                        </View>
-
-                                        {item.description && (
-                                          <Paragraph style={styles.stepDescription}>
-                                            {item.description}
-                                          </Paragraph>
-                                        )}
-
-                                        {item.imageUri && (
-                                          <View style={styles.imageContainer}>
-                                            <Image
-                                              source={{ uri: item.imageUri }}
-                                              style={styles.stepImage}
-                                            />
-                                          </View>
-                                        )}
-                                      </Card.Content>
-                                    </Card>
-                                  </TouchableOpacity>
-                                </Animated.View>
-                              );
+                      <View style={styles.simpleStepsContainer}>
+                        {stepsToComplete.map((step, index) => (
+                          <Animated.View 
+                            key={step.id}
+                            style={{
+                              opacity: stepAnimations[step.id] || 1,
+                              transform: [
+                                {
+                                  scale: stepAnimations[step.id]?.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [0.8, 1],
+                                  }) || 1
+                                },
+                                {
+                                  translateY: stepAnimations[step.id]?.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [20, 0],
+                                  }) || 0
+                                }
+                              ]
                             }}
-                          />
-                          <TouchableOpacity
-                            style={styles.addStepFAB}
-                            onPress={() => navigation.navigate('AddMilestone', { goalId: goal.id })}
                           >
-                            <LinearGradient
-                              colors={[themeColors.primary, themeColors.secondary]}
-                              start={{ x: 0, y: 0 }}
-                              end={{ x: 1, y: 1 }}
-                              style={styles.addStepFABGradient}
+                            <TouchableOpacity
+                              style={styles.stepContainer}
+                              onPress={() => handleCompleteMilestone(step.id, step.completed)}
+                              activeOpacity={0.7}
                             >
-                              <FontAwesome5 name="plus" size={20} color="#FFF" />
-                            </LinearGradient>
-                          </TouchableOpacity>
-                        </View>
-                      </GestureHandlerRootView>
+                              <View style={styles.stepRow}>
+                                {/* Checkbox */}
+                                <TouchableOpacity
+                                  style={[
+                                    styles.checkbox,
+                                    step.priority === 'milestone' ? styles.milestoneCheckbox : styles.stepCheckbox,
+                                    step.completed ? [
+                                      styles.checkboxCompleted,
+                                      step.priority === 'milestone' ? { backgroundColor: '#FFD700', borderColor: '#FFD700' } : null
+                                    ] : null
+                                  ]}
+                                  onPress={() => handleCompleteMilestone(step.id, step.completed)}
+                                  activeOpacity={0.7}
+                                >
+                                  {step.completed && (
+                                    <Ionicons 
+                                      name="checkmark" 
+                                      size={16} 
+                                      color="white" 
+                                    />
+                                  )}
+                                </TouchableOpacity>
+
+                                {/* Step Content */}
+                                <View style={styles.stepContent}>
+                                  <Text style={styles.stepTitle}>{step.title}</Text>
+                                  {step.description && (
+                                    <Text style={styles.stepDescription}>{step.description}</Text>
+                                  )}
+                                </View>
+
+                                {/* Milestone Badge */}
+                                {step.priority === 'milestone' && (
+                                  <View style={styles.milestoneBadge}>
+                                    <Ionicons name="star" size={16} color="#FFD700" />
+                                  </View>
+                                )}
+
+                                {/* Delete Button */}
+                                <TouchableOpacity
+                                  style={styles.deleteButton}
+                                  onPress={() => handleDeleteMilestone(step.id, step.title)}
+                                  activeOpacity={0.7}
+                                >
+                                  <FontAwesome5 name="trash" size={16} color="#FF3B30" />
+                                </TouchableOpacity>
+                              </View>
+                            </TouchableOpacity>
+                          </Animated.View>
+                        ))}
+                        
+                        {/* Add Step Button */}
+                        <TouchableOpacity
+                          style={styles.addStepButton}
+                          onPress={() => navigation.navigate('AddMilestone', { goalId: goal.id })}
+                        >
+                          <Ionicons name="add" size={16} color="#35CAFC" />
+                          <Text style={styles.addStepText}>Add New Step</Text>
+                        </TouchableOpacity>
+                      </View>
                     )}
                   </View>
                 </ScrollView>
               </View>
 
               {/* Timeline Page */}
-              <View style={styles.page}>
+              <View style={[styles.page, { width: SCREEN_WIDTH }]}>
                 <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                   <View style={styles.timelineSection}>
                     <Text style={[styles.sectionTitle, { marginTop: 0 }]}>Timeline</Text>
@@ -724,7 +726,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                               {/* Milestone node */}
                               <Animated.View style={[
                                 styles.timelineNode,
-                                milestone.isMilestone && styles.milestoneTimelineNode,
+                                milestone.isMilestone ? styles.milestoneTimelineNode : null,
                                 {
                                   backgroundColor: milestone.isMilestone ? themeColors.accent : themeColors.primary
                                 }
@@ -750,10 +752,10 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                               {/* Milestone content */}
                               <Card style={[
                                 styles.milestoneCard,
-                                milestone.isMilestone && [
+                                milestone.isMilestone ? [
                                   styles.milestoneTimelineCard,
                                   { borderLeftColor: themeColors.accent }
-                                ]
+                                ] : null
                               ]}>
                                 {milestone.isMilestone && (
                                   <>
@@ -823,16 +825,24 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                                   <View style={styles.milestoneHeader}>
                                     <Title style={[
                                       styles.milestoneTitle,
-                                      milestone.isMilestone && { color: themeColors.accent }
+                                      milestone.isMilestone ? { color: themeColors.accent } : null
                                     ]}>
                                       {milestone.title}
                                     </Title>
-                                    <TouchableOpacity
-                                      style={[styles.checkboxContainer, styles.checkboxCompleted]}
-                                      onPress={() => handleCompleteMilestone(milestone.id, milestone.completed)}
-                                    >
-                                      <FontAwesome5 name="check" size={14} color="#FFF" />
-                                    </TouchableOpacity>
+                                    <View style={styles.milestoneActions}>
+                                      <TouchableOpacity
+                                        style={[styles.deleteButton, { marginRight: 8 }]}
+                                        onPress={() => handleDeleteMilestone(milestone.id, milestone.title)}
+                                      >
+                                        <FontAwesome5 name="trash" size={16} color="#FF3B30" />
+                                      </TouchableOpacity>
+                                      <TouchableOpacity
+                                        style={[styles.checkboxContainer, styles.checkboxCompleted]}
+                                        onPress={() => handleCompleteMilestone(milestone.id, milestone.completed)}
+                                      >
+                                        <FontAwesome5 name="check" size={14} color="#FFF" />
+                                      </TouchableOpacity>
+                                    </View>
                                   </View>
 
                                   {milestone.description && (
@@ -869,8 +879,8 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
 
             {/* Page indicator dots */}
             <View style={styles.pageDotsContainer}>
-              <View style={[styles.pageDot, currentPage === 0 && styles.activePageDot, { backgroundColor: currentPage === 0 ? themeColors.primary : '#e0e0e0' }]} />
-              <View style={[styles.pageDot, currentPage === 1 && styles.activePageDot, { backgroundColor: currentPage === 1 ? themeColors.primary : '#e0e0e0' }]} />
+              <View style={[styles.pageDot, currentPage === 0 ? styles.activePageDot : null, { backgroundColor: currentPage === 0 ? themeColors.primary : '#e0e0e0' }]} />
+              <View style={[styles.pageDot, currentPage === 1 ? styles.activePageDot : null, { backgroundColor: currentPage === 1 ? themeColors.primary : '#e0e0e0' }]} />
             </View>
           </Animated.View>
         </GestureDetector>
@@ -913,13 +923,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-end',
     paddingRight: 10,
-    width: 180,
+    width: 210,
   },
   colorOption: {
     width: 30,
     height: 30,
     borderRadius: 15,
-    margin: 3,
+    margin: 4,
     borderWidth: 2,
     borderColor: 'white',
     shadowColor: '#000',
@@ -1207,16 +1217,17 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   addStepButton: {
-    marginTop: 20,
-    marginBottom: 20,
-    borderRadius: 12,
-    overflow: 'hidden',
-    alignSelf: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#35CAFC',
+    borderStyle: 'dashed',
+    backgroundColor: 'transparent',
   },
   addStepButtonGradient: {
     flexDirection: 'row',
@@ -1380,12 +1391,92 @@ const styles = StyleSheet.create({
   pagesContainer: {
     flex: 1,
     flexDirection: 'row',
-    width: SCREEN_WIDTH * 2,
   },
   page: {
-    width: SCREEN_WIDTH,
     flex: 1,
     position: 'relative',
+  },
+  stepActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  deleteButton: {
+    padding: 8,
+    borderRadius: 8,
+  },
+  milestoneActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  simpleStepsContainer: {
+    width: '100%',
+    alignSelf: 'center',
+  },
+  stepContainer: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    marginVertical: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  stepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    marginRight: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  stepCheckbox: {
+    borderColor: '#35CAFC',
+    backgroundColor: 'white',
+  },
+  milestoneCheckbox: {
+    borderColor: '#FFD700',
+    backgroundColor: '#FFFDF6',
+  },
+  checkboxCompleted: {
+    backgroundColor: '#35CAFC',
+    borderColor: '#35CAFC',
+  },
+  stepContent: {
+    flex: 1,
+    marginRight: 12,
+  },
+  stepTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 2,
+  },
+  stepDescription: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 18,
+  },
+  milestoneBadge: {
+    marginRight: 12,
+    padding: 4,
+  },
+  addStepText: {
+    color: '#35CAFC',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 });
 

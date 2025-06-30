@@ -4,11 +4,11 @@ import { useAuth } from './AuthContext';
 import { Goal } from '../types';
 
 // Update this to match your backend URL
-// Option 1: For emulator or dev on same machine (DON'T USE THIS - DOESN'T WORK ON REAL DEVICES) 
-// const API_URL = 'http://localhost:5001/api'; 
-// Option 2: For physical device or networks where IP is needed (USE THIS ONE)
-const API_URL = `http://${process.env.IP}:5001/api`;
-// Option 3: If running on the same device
+// Option 1: For development on same machine (USE FOR SIMULATOR)
+// const API_URL = 'http://localhost:5001/api';
+// Option 2: For physical device or networks where IP is needed (USE FOR IPHONE)
+const API_URL = 'http://192.168.181.206:5001/api';
+// Option 3: Alternative local address
 // const API_URL = 'http://127.0.0.1:5001/api';
 
 // Configure axios timeout for goal-related requests

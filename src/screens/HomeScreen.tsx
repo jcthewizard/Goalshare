@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, SafeAreaView, TouchableOpacity, Animated, Easing, Platform, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, FlatList, SafeAreaView, TouchableOpacity, Animated, Easing, Platform, StatusBar, Alert } from 'react-native';
 import { FAB, Card, Title, Paragraph, useTheme, Avatar, IconButton, Surface } from 'react-native-paper';
 import { useGoals } from '../contexts/GoalContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -259,6 +259,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 6,
   },
+  goalActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  deleteGoalButton: {
+    marginLeft: 8,
+  },
 });
 
 // Daily Quote Component with improved design
@@ -329,6 +336,7 @@ const ListHeaderComponent = ({ user }) => (
 // Define HomeScreen as a separate function to fix return type error
 function HomeScreen({ navigation }: Props): React.ReactElement {
   const goalContext = useGoals();
+  const { deleteGoal } = useGoals();
   const goals = goalContext.goalState ? goalContext.goalState.goals : [];
   const { user } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
@@ -366,6 +374,31 @@ function HomeScreen({ navigation }: Props): React.ReactElement {
     setRefreshing(false);
   };
 
+  // Delete handler
+  const handleDeleteGoal = (goalId: string, goalTitle: string): void => {
+    Alert.alert(
+      "Delete Goal",
+      `Are you sure you want to delete "${goalTitle}"? This action cannot be undone.`,
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteGoal(goalId);
+            } catch (error) {
+              Alert.alert("Error", "Failed to delete goal. Please try again.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const renderItem = ({ item, index }) => {
     // Calculate completion percentage
     const totalMilestones = item.milestones ? item.milestones.length : 0;
@@ -396,9 +429,20 @@ function HomeScreen({ navigation }: Props): React.ReactElement {
           <View style={styles.goalCardContent}>
             <View style={styles.goalTitleRow}>
               <Text style={styles.goalTitle}>{item.title}</Text>
-              {item.isPinned && (
-                <FontAwesome5 name="thumbtack" size={14} color="#FFF" style={styles.pinnedIcon} />
-              )}
+              <View style={styles.goalActions}>
+                {item.isPinned && (
+                  <FontAwesome5 name="thumbtack" size={14} color="#FFF" style={styles.pinnedIcon} />
+                )}
+                <TouchableOpacity
+                  style={styles.deleteGoalButton}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleDeleteGoal(item.id, item.title);
+                  }}
+                >
+                  <FontAwesome5 name="trash" size={14} color="rgba(255, 255, 255, 0.8)" />
+                </TouchableOpacity>
+              </View>
             </View>
 
             <View style={styles.goalInfoContainer}>

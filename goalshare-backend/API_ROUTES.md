@@ -24,10 +24,10 @@
 | `/api/goals` | `POST` | Create a new goal | Yes |
 | `/api/goals/:id` | `GET` | Get goal by ID | Yes |
 | `/api/goals/:id` | `PUT` | Update a goal | Yes |
-| `/api/goals/:id` | `DELETE` | Delete a goal | Yes |
+| `/api/goals/:id` | `DELETE` | Delete a goal (⚠️ Permanently removes goal and all milestones) | Yes |
 | `/api/goals/:id/milestones` | `POST` | Add milestone to goal | Yes |
 | `/api/goals/:id/milestones/:milestone_id` | `PUT` | Update milestone | Yes |
-| `/api/goals/:id/milestones/:milestone_id` | `DELETE` | Delete milestone | Yes |
+| `/api/goals/:id/milestones/:milestone_id` | `DELETE` | Delete milestone (⚠️ Permanently removes milestone) | Yes |
 
 ## Social Routes
 
@@ -60,10 +60,26 @@ All responses are in JSON format. Successful responses typically include the dat
 }
 ```
 
+### Delete Success Response
+
+```json
+{
+  "message": "Goal removed"
+}
+```
+
 ### Error Response
 
 ```json
 {
   "message": "Error message here"
 }
-``` 
+```
+
+## Delete Operations ⚠️
+
+**Important Notes:**
+- All delete operations are **permanent** and cannot be undone
+- Deleting a goal will also delete all associated milestones
+- Users can only delete goals and milestones they own
+- The frontend includes confirmation dialogs for all delete operations 
