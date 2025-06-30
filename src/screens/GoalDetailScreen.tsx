@@ -205,7 +205,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
   useEffect(() => {
     if (goal) {
       const incomplete = goal.milestones.filter(m => !m.completed || animatingSteps.has(m.id));
-      const completed = goal.milestones.filter(m => m.completed && !animatingSteps.has(m.id)).reverse(); // Reverse to show newest at top
+      const completed = goal.milestones.filter(m => m.completed && !animatingSteps.has(m.id)); // Show in original order
       setStepsToComplete(incomplete);
       setCompletedSteps(completed);
       
@@ -516,7 +516,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
             {/* Orange theme */}
             <TouchableOpacity
               style={[styles.colorOption, { backgroundColor: '#FFA500' }]}
-              onPress={() => changeThemeColors('#4CAF50', '#81C784', '#C8E6C9')}
+              onPress={() => changeThemeColors('#FF9800', '#FFCC80', '#FFE082')}
             />
           </Animated.View>
 

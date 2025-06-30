@@ -181,6 +181,7 @@ const FeedScreen = () => {
   const renderItem = ({ item, index }) => {
     const isLiked = user ? item.likes.includes(user.uid) : false;
     const hasComments = item.comments && item.comments.length > 0;
+    const isOwnPost = user && item.userId === user.uid;
 
     // Use existing animations or create default values for items that don't have animations
     const animations = itemAnimations[item.id] || { 
@@ -204,33 +205,52 @@ const FeedScreen = () => {
               <Avatar.Image
                 size={40}
                 source={{
-                  uri: 'https://randomuser.me/api/portraits/men/1.jpg'
+                  uri: item.userId === 'user1' 
+                    ? 'https://randomuser.me/api/portraits/men/1.jpg'
+                    : item.userId === 'user2'
+                    ? 'https://randomuser.me/api/portraits/women/2.jpg'
+                    : user && isOwnPost 
+                    ? (user.photoURL || 'https://randomuser.me/api/portraits/men/32.jpg')
+                    : 'https://randomuser.me/api/portraits/men/3.jpg'
                 }}
               />
               <View style={styles.userTextContainer}>
-                <Text style={styles.username}>{item.displayName}</Text>
+                <Text style={styles.username}>
+                  {isOwnPost ? 'You' : item.displayName}
+                </Text>
                 <Text style={styles.timestamp}>
                   {formatDistanceToNow(new Date(item.timestamp))} ago
                 </Text>
               </View>
             </View>
+            {isOwnPost && (
+              <View style={styles.ownPostBadge}>
+                <MaterialCommunityIcons name="account-circle" size={16} color="#4CAF50" />
+              </View>
+            )}
           </View>
 
           <View style={styles.goalInfo}>
             <Text style={styles.goalTitle}>
-              Completed a milestone for "{item.goalTitle}"
+              {isOwnPost ? '🎉 You completed' : `✨ ${item.displayName} completed`} a milestone for "{item.goalTitle}"
             </Text>
             <View style={styles.milestoneContainer}>
               <LinearGradient
-                colors={['#f0f0f0', '#e0e0e0']}
+                colors={isOwnPost ? ['#4CAF50', '#81C784'] : ['#2196F3', '#64B5F6']}
                 style={styles.milestoneBadge}
               >
+                <MaterialCommunityIcons 
+                  name="flag-checkered" 
+                  size={16} 
+                  color="white" 
+                  style={styles.milestoneIcon}
+                />
                 <Text style={styles.milestoneTitle}>{item.milestoneTitle}</Text>
               </LinearGradient>
             </View>
             {item.milestoneDescription && (
               <Text style={styles.milestoneDescription}>
-                {item.milestoneDescription}
+                "{item.milestoneDescription}"
               </Text>
             )}
           </View>
@@ -241,6 +261,10 @@ const FeedScreen = () => {
                 source={{ uri: item.imageUri }}
                 style={styles.image}
                 resizeMode="cover"
+              />
+              <LinearGradient
+                colors={['transparent', 'rgba(0,0,0,0.3)']}
+                style={styles.imageOverlay}
               />
             </View>
           )}
@@ -254,9 +278,9 @@ const FeedScreen = () => {
                 <FontAwesome
                   name={isLiked ? "heart" : "heart-o"}
                   size={22}
-                  color={isLiked ? theme.colors.primary : "#666"}
+                  color={isLiked ? "#FF6B6B" : "#666"}
                 />
-                <Text style={styles.likeCount}>
+                <Text style={[styles.likeCount, isLiked && styles.likedText]}>
                   {item.likes.length}
                 </Text>
               </TouchableOpacity>
@@ -275,6 +299,14 @@ const FeedScreen = () => {
                 {item.comments.length}
               </Text>
             </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionButton}>
+              <MaterialCommunityIcons
+                name="share-outline"
+                size={22}
+                color="#666"
+              />
+            </TouchableOpacity>
           </View>
 
           {hasComments && (
@@ -286,7 +318,7 @@ const FeedScreen = () => {
               {item.comments.slice(0, 2).map(comment => (
                 <View key={comment.id} style={styles.commentItem}>
                   <Text style={styles.commentUsername}>
-                    {comment.displayName}
+                    {comment.userId === user?.uid ? 'You' : comment.displayName}
                   </Text>
                   <Text style={styles.commentText}>{comment.text}</Text>
                   <Text style={styles.commentTimestamp}>
@@ -493,6 +525,13 @@ const styles = StyleSheet.create({
   userTextContainer: {
     marginLeft: 12,
   },
+  ownPostBadge: {
+    backgroundColor: '#E8F5E8',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 8,
+  },
   username: {
     fontWeight: 'bold',
     fontSize: 16,
@@ -519,25 +558,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 16,
     alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   milestoneTitle: {
     fontWeight: 'bold',
     fontSize: 15,
-    color: '#555',
+    color: 'white',
+  },
+  milestoneIcon: {
+    marginRight: 8,
   },
   milestoneDescription: {
     fontSize: 14,
     color: '#666',
     lineHeight: 20,
     marginTop: 4,
+    fontStyle: 'italic',
   },
   imageContainer: {
     width: '100%',
     height: 200,
+    position: 'relative',
   },
   image: {
     width: '100%',
     height: '100%',
+  },
+  imageOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '30%',
   },
   postActions: {
     flexDirection: 'row',
@@ -719,6 +772,9 @@ const styles = StyleSheet.create({
     zIndex: 999,
     elevation: 5,
     transform: [{ translateZ: 0 }],
+  },
+  likedText: {
+    color: '#FF6B6B',
   },
 });
 

@@ -190,11 +190,61 @@ export const SocialProvider: React.FC<{children: React.ReactNode}> = ({ children
             goalTitle: 'Run a Marathon',
             milestoneId: 'milestone2',
             milestoneTitle: 'Complete 10k training run',
-            milestoneDescription: 'Finished a 10k run in 55 minutes',
+            milestoneDescription: 'Finished a 10k run in 55 minutes - feeling stronger every day!',
             imageUri: 'https://images.unsplash.com/photo-1594737625785-a6cbdabd333c?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxzZWFyY2h8Mnx8cnVubmluZ3xlbnwwfHwwfHw%3D',
             timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 days ago
             likes: [MOCK_USERS[0].uid],
+            comments: [
+              {
+                id: 'comment2',
+                userId: MOCK_USERS[0].uid,
+                displayName: MOCK_USERS[0].displayName,
+                text: 'Amazing pace! You\'re going to crush that marathon!',
+                timestamp: new Date(Date.now() - 4.5 * 24 * 60 * 60 * 1000).toISOString()
+              }
+            ]
+          },
+          {
+            id: 'update3',
+            userId: MOCK_USERS[2].uid,
+            displayName: MOCK_USERS[2].displayName,
+            goalId: 'goal3',
+            goalTitle: 'Learn Guitar',
+            milestoneId: 'milestone3',
+            milestoneTitle: 'Play first song',
+            milestoneDescription: 'Successfully played "Wonderwall" all the way through!',
+            imageUri: 'https://images.unsplash.com/photo-1525201548942-d8732f6617a0?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+            timestamp: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days ago
+            likes: [MOCK_USERS[0].uid, MOCK_USERS[1].uid],
             comments: []
+          },
+          {
+            id: 'update4',
+            userId: MOCK_USERS[1].uid,
+            displayName: MOCK_USERS[1].displayName,
+            goalId: 'goal4',
+            goalTitle: 'Read 50 Books This Year',
+            milestoneId: 'milestone4',
+            milestoneTitle: 'Finish book #10',
+            milestoneDescription: 'Just finished "Atomic Habits" - highly recommend!',
+            timestamp: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(), // 10 days ago
+            likes: [],
+            comments: [
+              {
+                id: 'comment3',
+                userId: MOCK_USERS[0].uid,
+                displayName: MOCK_USERS[0].displayName,
+                text: 'That book changed my life! What\'s next on your list?',
+                timestamp: new Date(Date.now() - 9.5 * 24 * 60 * 60 * 1000).toISOString()
+              },
+              {
+                id: 'comment4',
+                userId: MOCK_USERS[2].uid,
+                displayName: MOCK_USERS[2].displayName,
+                text: 'You\'re flying through those books! 📚',
+                timestamp: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000).toISOString()
+              }
+            ]
           }
         ];
 
