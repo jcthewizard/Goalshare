@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { Card, Title, Paragraph, Checkbox, useTheme, IconButton } from 'react-native-paper';
 import { useGoals } from '../contexts/GoalContext';
-import { useSocial } from '../contexts/SocialContext';
+
 import { useAuth } from '../contexts/AuthContext';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation';
@@ -148,8 +148,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
   const stepScale = useRef(new Animated.Value(1)).current;
   const stepOpacity = useRef(new Animated.Value(1)).current;
 
-  // Get social context for sharing
-  const { addMilestoneCompletionUpdate } = useSocial();
+
 
   // Delete handlers
   const handleDeleteGoal = (): void => {
@@ -265,22 +264,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
               return newSet;
             });
 
-            // Add to feed as a social update
-            const milestone = goal.milestones.find(m => m.id === milestoneId);
-            if (milestone && user) {
-              try {
-                addMilestoneCompletionUpdate({
-                  goalId: goal.id,
-                  goalTitle: goal.title,
-                  milestoneId: milestone.id,
-                  milestoneTitle: milestone.title,
-                  milestoneDescription: milestone.description,
-                  imageUri: milestone.imageUri
-                });
-              } catch (error) {
-                console.error("Failed to share update:", error);
-              }
-            }
+
           });
         }, 600); // Increased delay to show the checkmark longer
       } else {
@@ -550,7 +534,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
             <View style={styles.goalCardHeader}>
               <Text style={styles.goalCardTitle}>{goal.title}</Text>
               <View style={styles.dateContainer}>
-                <FontAwesome5 name="calendar-alt" size={14} color="#FFF" style={{marginRight: 6}} />
+                <FontAwesome5 name="calendar-alt" size={14} color="#FFF" style={{ marginRight: 6 }} />
                 <Text style={styles.goalInfoText}>
                   {goal.targetDate ? format(new Date(goal.targetDate), 'MMM d, yyyy') : 'No target date'}
                 </Text>
@@ -640,29 +624,29 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                                   onPress={() => handleCompleteMilestone(step.id, step.completed)}
                                   activeOpacity={0.7}
                                 >
-                                  {step.completed && (
+                                  {step.completed ? (
                                     <Ionicons 
                                       name="checkmark" 
                                       size={16} 
                                       color="white" 
                                     />
-                                  )}
+                                  ) : null}
                                 </TouchableOpacity>
 
                                 {/* Step Content */}
                                 <View style={styles.stepContent}>
                                   <Text style={styles.stepTitle}>{step.title}</Text>
-                                  {step.description && (
+                                  {step.description ? (
                                     <Text style={styles.stepDescription}>{step.description}</Text>
-                                  )}
+                                  ) : null}
                                 </View>
 
                                 {/* Milestone Badge */}
-                                {step.priority === 'milestone' && (
+                                {step.priority === 'milestone' ? (
                                   <View style={styles.milestoneBadge}>
                                     <Ionicons name="star" size={16} color="#FFD700" />
                                   </View>
-                                )}
+                                ) : null}
 
                                 {/* Delete Button */}
                                 <TouchableOpacity
@@ -719,9 +703,9 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                               ]}
                             >
                               {/* Timeline connector - show only if not the last item */}
-                              {index < completedSteps.length - 1 && (
+                              {index < completedSteps.length - 1 ? (
                                 <View style={styles.timelineConnector} />
-                              )}
+                              ) : null}
 
                               {/* Milestone node */}
                               <Animated.View style={[
@@ -731,7 +715,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                                   backgroundColor: milestone.isMilestone ? themeColors.accent : themeColors.primary
                                 }
                               ]}>
-                                {milestone.isMilestone && (
+                                {milestone.isMilestone ? (
                                   <Animated.View style={[
                                     styles.shimmerOverlay,
                                     {
@@ -741,7 +725,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                                       })
                                     }
                                   ]} />
-                                )}
+                                ) : null}
                                 {milestone.isMilestone ? (
                                   <FontAwesome5 name="star" size={16} color={themeColors.accent} />
                                 ) : (
@@ -757,14 +741,14 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                                   { borderLeftColor: themeColors.accent }
                                 ] : null
                               ]}>
-                                {milestone.isMilestone && (
+                                {milestone.isMilestone ? (
                                   <>
-                                    <LinearGradient
-                                      colors={[`${themeColors.accent}20`, '#FFFCF3']}
-                                      start={{ x: 0, y: 0 }}
-                                      end={{ x: 1, y: 0 }}
-                                      style={styles.milestoneCardGradient}
-                                    />
+                                                        <LinearGradient
+                      colors={[themeColors.accent + '20', '#FFFCF3']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.milestoneCardGradient}
+                    />
                                     <Animated.View
                                       style={[
                                         styles.milestoneFireBorder,
@@ -820,7 +804,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                                       </Animated.View>
                                     </View>
                                   </>
-                                )}
+                                ) : null}
                                 <Card.Content>
                                   <View style={styles.milestoneHeader}>
                                     <Title style={[
@@ -845,21 +829,21 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                                     </View>
                                   </View>
 
-                                  {milestone.description && (
+                                  {milestone.description ? (
                                     <Paragraph style={styles.milestoneDescription}>
                                       {milestone.description}
                                     </Paragraph>
-                                  )}
+                                  ) : null}
 
                                   {/* Display milestone image if available */}
-                                  {milestone.imageUri && (
+                                  {milestone.imageUri ? (
                                     <View style={styles.imageContainer}>
                                       <Image
                                         source={{ uri: milestone.imageUri }}
                                         style={styles.milestoneImage}
                                       />
                                     </View>
-                                  )}
+                                  ) : null}
 
                                   {/* Completion date could be added here */}
                                   <Text style={styles.completedDate}>
@@ -879,8 +863,16 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
 
             {/* Page indicator dots */}
             <View style={styles.pageDotsContainer}>
-              <View style={[styles.pageDot, currentPage === 0 ? styles.activePageDot : null, { backgroundColor: currentPage === 0 ? themeColors.primary : '#e0e0e0' }]} />
-              <View style={[styles.pageDot, currentPage === 1 ? styles.activePageDot : null, { backgroundColor: currentPage === 1 ? themeColors.primary : '#e0e0e0' }]} />
+              <View style={[
+                styles.pageDot, 
+                currentPage === 0 ? styles.activePageDot : null, 
+                { backgroundColor: currentPage === 0 ? themeColors.primary : '#e0e0e0' }
+              ]} />
+              <View style={[
+                styles.pageDot, 
+                currentPage === 1 ? styles.activePageDot : null, 
+                { backgroundColor: currentPage === 1 ? themeColors.primary : '#e0e0e0' }
+              ]} />
             </View>
           </Animated.View>
         </GestureDetector>

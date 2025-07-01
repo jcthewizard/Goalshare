@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+logs/
+*.log
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Feed-related files (removed from goal-focused app)
+routes/social.js
+routes/users.js
+src/routes/posts.js
+src/models/Post.js
+controllers/users.js
+
+# Temporary files
+tmp/
+temp/ 

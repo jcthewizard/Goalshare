@@ -25,13 +25,12 @@ import { useAuth } from '../contexts/AuthContext';
 import { useGoals } from '../contexts/GoalContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome5 } from '@expo/vector-icons';
-import { FriendsList } from '../components/FriendsList';
+
 
 const ProfileScreen = () => {
   const { user, logout } = useAuth();
   const { goalState } = useGoals();
   const theme = useTheme();
-  const [activeTab, setActiveTab] = useState('stats');
 
   const completedGoals = goalState.goals.filter(goal => goal.completed).length;
   const totalMilestones = goalState.goals.reduce((sum, goal) => sum + goal.milestones.length, 0);
@@ -56,69 +55,33 @@ const ProfileScreen = () => {
     }
   };
 
-  // Common header with profile info
+  // Profile header with profile info
   const renderProfileHeader = () => (
-    <>
-      <LinearGradient
-        colors={['#FF5F5F', '#FF8C8C']}
-        style={styles.profileHeader}
-      >
-        <View style={styles.profileInfo}>
-          <View style={styles.avatarContainer}>
-            {user?.photoURL ? (
-              <Image
-                source={{ uri: user.photoURL }}
-                style={styles.avatarImage}
-              />
-            ) : (
-              <Avatar.Text
-                size={80}
-                label={user?.displayName?.substring(0, 2)?.toUpperCase() || '?'}
-                color="#FFF"
-                style={styles.avatar}
-                labelStyle={{ fontWeight: '700' }}
-              />
-            )}
-          </View>
-          <Text style={styles.userName}>{user?.displayName || 'User'}</Text>
-          <Text style={styles.userEmail}>{user?.email}</Text>
+    <LinearGradient
+      colors={['#FF5F5F', '#FF8C8C']}
+      style={styles.profileHeader}
+    >
+      <View style={styles.profileInfo}>
+        <View style={styles.avatarContainer}>
+          {user?.photoURL ? (
+            <Image
+              source={{ uri: user.photoURL }}
+              style={styles.avatarImage}
+            />
+          ) : (
+            <Avatar.Text
+              size={80}
+              label={user?.displayName?.substring(0, 2)?.toUpperCase() || '?'}
+              color="#FFF"
+              style={styles.avatar}
+              labelStyle={{ fontWeight: '700' }}
+            />
+          )}
         </View>
-      </LinearGradient>
-
-      {/* Content Tabs */}
-      <View style={styles.tabsContainer}>
-        <View style={styles.tabs}>
-          <TouchableOpacity
-            style={[
-              styles.tab,
-              activeTab === 'stats' && styles.activeTab
-            ]}
-            onPress={() => setActiveTab('stats')}
-          >
-            <Text style={[
-              styles.tabText,
-              activeTab === 'stats' && styles.activeTabText
-            ]}>
-              Stats
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.tab,
-              activeTab === 'friends' && styles.activeTab
-            ]}
-            onPress={() => setActiveTab('friends')}
-          >
-            <Text style={[
-              styles.tabText,
-              activeTab === 'friends' && styles.activeTabText
-            ]}>
-              Friends
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.userName}>{user?.displayName || 'User'}</Text>
+        <Text style={styles.userEmail}>{user?.email}</Text>
       </View>
-    </>
+    </LinearGradient>
   );
 
   // Render the logout button
@@ -133,111 +96,104 @@ const ProfileScreen = () => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {activeTab === 'stats' ? (
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          {renderProfileHeader()}
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {renderProfileHeader()}
 
-          {/* Stats Section */}
-          <View style={styles.statsSection}>
-            <Text style={styles.sectionTitle}>Your Progress</Text>
+        {/* Stats Section */}
+        <View style={styles.statsSection}>
+          <Text style={styles.sectionTitle}>Your Progress</Text>
 
-            {/* Stats Cards */}
-            <View style={styles.statsCards}>
-              {/* Goals Card */}
-              <Card style={styles.statsCard}>
-                <LinearGradient
-                  colors={['#35CAFC', '#70D6FF']}
-                  style={styles.statsCardContent}
-                >
-                  <View style={styles.statsIconContainer}>
-                    <FontAwesome5 name="flag" size={22} color="#FFF" />
-                  </View>
-                  <Text style={styles.statsNumber}>{goalState.goals.length}</Text>
-                  <Text style={styles.statsLabel}>Total Goals</Text>
-                </LinearGradient>
-              </Card>
-
-              {/* Completed Goals Card */}
-              <Card style={styles.statsCard}>
-                <LinearGradient
-                  colors={['#4CD964', '#7CEC9F']}
-                  style={styles.statsCardContent}
-                >
-                  <View style={styles.statsIconContainer}>
-                    <FontAwesome5 name="check-circle" size={22} color="#FFF" />
-                  </View>
-                  <Text style={styles.statsNumber}>{completedGoals}</Text>
-                  <Text style={styles.statsLabel}>Completed</Text>
-                </LinearGradient>
-              </Card>
-            </View>
-
-            {/* Completion Rates */}
-            <Card style={styles.completionCard}>
-              <Card.Content>
-                <View style={styles.completionHeader}>
-                  <Text style={styles.completionTitle}>Completion Rates</Text>
+          {/* Stats Cards */}
+          <View style={styles.statsCards}>
+            {/* Goals Card */}
+            <Card style={styles.statsCard}>
+              <LinearGradient
+                colors={['#35CAFC', '#70D6FF']}
+                style={styles.statsCardContent}
+              >
+                <View style={styles.statsIconContainer}>
+                  <FontAwesome5 name="flag" size={22} color="#FFF" />
                 </View>
+                <Text style={styles.statsNumber}>{goalState.goals.length}</Text>
+                <Text style={styles.statsLabel}>Total Goals</Text>
+              </LinearGradient>
+            </Card>
 
-                {/* Goals Completion */}
-                <View style={styles.completionSection}>
-                  <View style={styles.completionLabelRow}>
-                    <Text style={styles.completionLabel}>Goals</Text>
-                    <Text style={styles.completionPercent}>{goalCompletionRate}%</Text>
-                  </View>
-                  <View style={styles.progressBarContainer}>
-                    <View
-                      style={[
-                        styles.progressBar,
-                        { width: `${goalCompletionRate}%`, backgroundColor: theme.colors.primary }
-                      ]}
-                    />
-                  </View>
+            {/* Completed Goals Card */}
+            <Card style={styles.statsCard}>
+              <LinearGradient
+                colors={['#4CD964', '#7CEC9F']}
+                style={styles.statsCardContent}
+              >
+                <View style={styles.statsIconContainer}>
+                  <FontAwesome5 name="check-circle" size={22} color="#FFF" />
                 </View>
-
-                {/* Milestones Completion */}
-                <View style={styles.completionSection}>
-                  <View style={styles.completionLabelRow}>
-                    <Text style={styles.completionLabel}>Milestones</Text>
-                    <Text style={styles.completionPercent}>{milestoneCompletionRate}%</Text>
-                  </View>
-                  <View style={styles.progressBarContainer}>
-                    <View
-                      style={[
-                        styles.progressBar,
-                        { width: `${milestoneCompletionRate}%`, backgroundColor: theme.colors.accent }
-                      ]}
-                    />
-                  </View>
-                </View>
-
-                {/* Total Stats */}
-                <View style={styles.totalStatsContainer}>
-                  <View style={styles.totalStatItem}>
-                    <Text style={styles.totalStatLabel}>Total Milestones</Text>
-                    <Text style={styles.totalStatValue}>{totalMilestones}</Text>
-                  </View>
-                  <View style={styles.totalStatDivider} />
-                  <View style={styles.totalStatItem}>
-                    <Text style={styles.totalStatLabel}>Completed</Text>
-                    <Text style={styles.totalStatValue}>{completedMilestones}</Text>
-                  </View>
-                </View>
-              </Card.Content>
+                <Text style={styles.statsNumber}>{completedGoals}</Text>
+                <Text style={styles.statsLabel}>Completed</Text>
+              </LinearGradient>
             </Card>
           </View>
 
-          {renderLogoutButton()}
-        </ScrollView>
-      ) : (
-        <View style={styles.container}>
-          {renderProfileHeader()}
-          <View style={styles.friendsContainer}>
-            <FriendsList />
-          </View>
-          {renderLogoutButton()}
+          {/* Completion Rates */}
+          <Card style={styles.completionCard}>
+            <Card.Content>
+              <View style={styles.completionHeader}>
+                <Text style={styles.completionTitle}>Completion Rates</Text>
+              </View>
+
+              {/* Goals Completion */}
+              <View style={styles.completionSection}>
+                <View style={styles.completionLabelRow}>
+                  <Text style={styles.completionLabel}>Goals</Text>
+                  <Text style={styles.completionPercent}>{goalCompletionRate}%</Text>
+                </View>
+                <View style={styles.progressBarContainer}>
+                  <View
+                    style={[
+                      styles.progressBar,
+                      { width: `${goalCompletionRate}%`, backgroundColor: theme.colors.primary }
+                    ]}
+                  />
+                </View>
+              </View>
+
+              {/* Milestones Completion */}
+              <View style={styles.completionSection}>
+                <View style={styles.completionLabelRow}>
+                  <Text style={styles.completionLabel}>Milestones</Text>
+                  <Text style={styles.completionPercent}>{milestoneCompletionRate}%</Text>
+                </View>
+                <View style={styles.progressBarContainer}>
+                  <View
+                    style={[
+                      styles.progressBar,
+                      { width: `${milestoneCompletionRate}%`, backgroundColor: theme.colors.accent }
+                    ]}
+                  />
+                </View>
+              </View>
+
+              {/* Total Stats */}
+              <View style={styles.totalStatsContainer}>
+                <View style={styles.totalStatItem}>
+                  <Text style={styles.totalStatLabel}>Total Milestones</Text>
+                  <Text style={styles.totalStatValue}>{totalMilestones}</Text>
+                </View>
+                <View style={styles.totalStatDivider} />
+                <View style={styles.totalStatItem}>
+                  <Text style={styles.totalStatLabel}>Completed</Text>
+                  <Text style={styles.totalStatValue}>{completedMilestones}</Text>
+                </View>
+              </View>
+            </Card.Content>
+          </Card>
         </View>
-      )}
+
+        {renderLogoutButton()}
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -247,7 +203,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 40,
+    paddingBottom: 70, // Extra padding to ensure logout button is accessible above bottom navigation
   },
   profileHeader: {
     paddingTop: 40,
@@ -290,39 +246,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: 'rgba(255, 255, 255, 0.8)',
   },
-  tabsContainer: {
-    paddingHorizontal: 20,
-    marginTop: 20,
-    marginBottom: 10,
-  },
-  tabs: {
-    flexDirection: 'row',
-    backgroundColor: '#f0f0f0',
-    borderRadius: 25,
-    padding: 4,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 25,
-  },
-  activeTab: {
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  tabText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#888',
-  },
-  activeTabText: {
-    color: '#FF5F5F',
-  },
   statsSection: {
     padding: 20,
   },
@@ -330,6 +253,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     marginBottom: 20,
+    marginTop: 20,
     color: '#333',
   },
   statsCards: {
@@ -446,7 +370,8 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     paddingVertical: 14,
     marginHorizontal: 20,
-    marginTop: 20,
+    marginTop: 30,
+    marginBottom: 20,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#EEEEEE',
@@ -455,10 +380,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#FF5F5F',
-  },
-  friendsContainer: {
-    flex: 1,
-    padding: 0,
   },
 });
 

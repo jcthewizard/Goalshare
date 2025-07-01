@@ -31,7 +31,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 const AnimatedFlatList = Animated.createAnimatedComponent(FlatList);
 
 const FeedScreen = () => {
-  const { feedUpdates, likeFeedItem, unlikeFeedItem, addComment } = useSocial();
+  const { feedUpdates, likeFeedItem, unlikeFeedItem, addComment, loading, error, refreshFeed } = useSocial();
   const { user } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [commentText, setCommentText] = useState('');
@@ -148,9 +148,13 @@ const FeedScreen = () => {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    // In a real app, we would refresh the feed data here
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setRefreshing(false);
+    try {
+      await refreshFeed();
+    } catch (error) {
+      console.error('Error refreshing feed:', error);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   // Use a memoized handler for like/unlike to avoid re-renders
@@ -447,7 +451,7 @@ const FeedScreen = () => {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
+            refreshing={refreshing || loading}
             onRefresh={handleRefresh}
             colors={[theme.colors.primary]}
             tintColor={theme.colors.primary}
@@ -459,17 +463,40 @@ const FeedScreen = () => {
         )}
         scrollEventThrottle={16}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <MaterialCommunityIcons
-              name="account-group"
-              size={60}
-              color={theme.colors.primary}
-            />
-            <Text style={styles.emptyTitle}>No updates yet</Text>
-            <Text style={styles.emptyText}>
-              Updates from friends will appear here. Start by adding some friends!
-            </Text>
-          </View>
+          loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={theme.colors.primary} />
+              <Text style={styles.loadingText}>Loading feed...</Text>
+            </View>
+          ) : error ? (
+            <View style={styles.errorContainer}>
+              <MaterialCommunityIcons
+                name="alert-circle"
+                size={60}
+                color="#FF6B6B"
+              />
+              <Text style={styles.errorTitle}>Unable to load feed</Text>
+              <Text style={styles.errorText}>{error}</Text>
+              <TouchableOpacity
+                style={styles.retryButton}
+                onPress={handleRefresh}
+              >
+                <Text style={styles.retryButtonText}>Try Again</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <MaterialCommunityIcons
+                name="account-group"
+                size={60}
+                color={theme.colors.primary}
+              />
+              <Text style={styles.emptyTitle}>No updates yet</Text>
+              <Text style={styles.emptyText}>
+                Updates from friends will appear here. Start by adding some friends!
+              </Text>
+            </View>
+          )
         }
       />
 
@@ -775,6 +802,46 @@ const styles = StyleSheet.create({
   },
   likedText: {
     color: '#FF6B6B',
+  },
+  loadingContainer: {
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 60,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#888',
+    marginTop: 16,
+  },
+  errorContainer: {
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 60,
+  },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 16,
+    color: '#555',
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#888',
+    textAlign: 'center',
+    marginTop: 8,
+    lineHeight: 22,
+  },
+  retryButton: {
+    padding: 12,
+    backgroundColor: '#4CAF50',
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: 'white',
   },
 });
 

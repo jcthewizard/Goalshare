@@ -37,3 +37,9 @@ yarn-error.*
 goalshare-backend/.env
 # typescript
 *.tsbuildinfo
+
+# Feed-related files
+src/screens/FeedScreen.tsx
+src/contexts/SocialContext.tsx
+src/components/CommentModal.tsx
+src/components/FriendsList.tsx

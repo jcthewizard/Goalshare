@@ -8,7 +8,7 @@ import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import HomeScreen from '../screens/HomeScreen';
 import ProfileScreen from '../screens/ProfileScreen';
-import FeedScreen from '../screens/FeedScreen';
+
 import GoalDetailScreen from '../screens/GoalDetailScreen';
 import AddGoalScreen from '../screens/AddGoalScreen';
 import AddMilestoneScreen from '../screens/AddMilestoneScreen';
@@ -32,7 +32,6 @@ export type AuthStackParamList = {
 };
 
 export type MainTabParamList = {
-  Feed: undefined;
   Home: undefined;
   Profile: undefined;
 };
@@ -123,9 +122,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
 
             // Icon based on route name
             let iconName;
-            if (route.name === 'Feed') {
-              iconName = 'newspaper';
-            } else if (route.name === 'Home') {
+            if (route.name === 'Home') {
               iconName = 'home';
             } else if (route.name === 'Profile') {
               iconName = 'user';
@@ -232,13 +229,6 @@ const MainTabNavigator = () => (
     }}
     initialRouteName="Home"
   >
-    <Tab.Screen
-      name="Feed"
-      component={FeedScreen}
-      options={{
-        tabBarLabel: 'Feed',
-      }}
-    />
     <Tab.Screen
       name="Home"
       component={HomeScreen}

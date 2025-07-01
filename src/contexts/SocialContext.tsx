@@ -6,6 +6,11 @@ import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { v4 as uuidv4 } from 'uuid';
 
+// API Configuration
+const API_BASE_URL = __DEV__ 
+  ? 'http://192.168.181.206:5001/api' 
+  : 'https://your-production-api.com/api';
+
 // Types
 interface User {
   uid: string;
@@ -41,6 +46,7 @@ interface MilestoneUpdate {
   timestamp: string;
   likes: string[]; // array of userIds
   comments: Comment[];
+  postType?: string;
 }
 
 interface Comment {
@@ -56,6 +62,8 @@ interface SocialContextType {
   incomingRequests: FriendRequest[];
   outgoingRequests: FriendRequest[];
   feedUpdates: MilestoneUpdate[];
+  loading: boolean;
+  error: string | null;
   searchUsers: (query: string) => Promise<User[]>;
   sendFriendRequest: (userId: string) => Promise<void>;
   acceptFriendRequest: (requestId: string) => Promise<void>;
@@ -73,12 +81,53 @@ interface SocialContextType {
   unlikeFeedItem: (updateId: string) => Promise<void>;
   addComment: (updateId: string, text: string) => Promise<void>;
   deleteComment: (updateId: string, commentId: string) => Promise<void>;
+  refreshFeed: () => Promise<void>;
   getFriendCount: () => number;
   getIncomingRequestCount: () => number;
 }
 
 // Create the context
 const SocialContext = createContext<SocialContextType | undefined>(undefined);
+
+// API Helper Functions
+const getAuthToken = async () => {
+  try {
+    return await AsyncStorage.getItem('authToken');
+  } catch (error) {
+    console.error('Error getting auth token:', error);
+    return null;
+  }
+};
+
+const apiRequest = async (endpoint: string, options: any = {}) => {
+  try {
+    const token = await getAuthToken();
+    const url = `${API_BASE_URL}${endpoint}`;
+    
+    const config = {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` }),
+        ...options.headers,
+      },
+      ...options,
+    };
+
+    console.log(`API Request: ${options.method || 'GET'} ${url}`);
+    
+    const response = await fetch(url, config);
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || `HTTP error! status: ${response.status}`);
+    }
+
+    return data;
+  } catch (error) {
+    console.error(`API Error (${endpoint}):`, error);
+    throw error;
+  }
+};
 
 // Mock server data - in a real app, this would come from a backend
 const MOCK_USERS: User[] = [
@@ -96,29 +145,30 @@ export const SocialProvider: React.FC<{children: React.ReactNode}> = ({ children
   const [incomingRequests, setIncomingRequests] = useState<FriendRequest[]>([]);
   const [outgoingRequests, setOutgoingRequests] = useState<FriendRequest[]>([]);
   const [feedUpdates, setFeedUpdates] = useState<MilestoneUpdate[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Initialize with mock data
+  // Initialize with data
   useEffect(() => {
     if (user) {
       loadSocialData();
+      refreshFeed();
     }
   }, [user]);
 
   const loadSocialData = async () => {
     try {
-      // Load friends, requests, and feed from AsyncStorage
+      // Load friends and requests from AsyncStorage (keeping mock data for now)
       const storedFriends = await AsyncStorage.getItem('friends');
       const storedIncomingRequests = await AsyncStorage.getItem('incomingRequests');
       const storedOutgoingRequests = await AsyncStorage.getItem('outgoingRequests');
-      const storedFeedUpdates = await AsyncStorage.getItem('feedUpdates');
 
       if (storedFriends) setFriends(JSON.parse(storedFriends));
       if (storedIncomingRequests) setIncomingRequests(JSON.parse(storedIncomingRequests));
       if (storedOutgoingRequests) setOutgoingRequests(JSON.parse(storedOutgoingRequests));
-      if (storedFeedUpdates) setFeedUpdates(JSON.parse(storedFeedUpdates));
 
       // If we haven't loaded any data yet, initialize with mock data
-      if (!storedFriends && !storedIncomingRequests && !storedFeedUpdates) {
+      if (!storedFriends && !storedIncomingRequests) {
         // Add some mock friends
         const mockFriends: Friend[] = [
           {
@@ -159,7 +209,53 @@ export const SocialProvider: React.FC<{children: React.ReactNode}> = ({ children
           }
         ];
 
-        // Add some mock feed updates
+        setFriends(mockFriends);
+        setIncomingRequests(mockIncomingRequests);
+
+        // Store in AsyncStorage
+        await AsyncStorage.setItem('friends', JSON.stringify(mockFriends));
+        await AsyncStorage.setItem('incomingRequests', JSON.stringify(mockIncomingRequests));
+      }
+    } catch (error) {
+      console.error('Error loading social data:', error);
+      setError('Failed to load social data');
+    }
+  };
+
+  // Fetch feed from backend
+  const refreshFeed = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await apiRequest('/posts?limit=20&page=1');
+      
+      if (response.success && response.data.posts) {
+        setFeedUpdates(response.data.posts);
+      } else {
+        // Fallback to mock data if API fails
+        console.log('API failed, using mock data');
+        await loadMockFeedData();
+      }
+    } catch (error) {
+      console.error('Error refreshing feed:', error);
+      setError('Failed to load feed');
+      // Fallback to mock data
+      await loadMockFeedData();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fallback mock data loader
+  const loadMockFeedData = async () => {
+    try {
+      const storedFeedUpdates = await AsyncStorage.getItem('feedUpdates');
+      
+      if (storedFeedUpdates) {
+        setFeedUpdates(JSON.parse(storedFeedUpdates));
+      } else {
+        // Initialize with mock feed data
         const mockFeedUpdates: MilestoneUpdate[] = [
           {
             id: 'update1',
@@ -170,7 +266,7 @@ export const SocialProvider: React.FC<{children: React.ReactNode}> = ({ children
             milestoneId: 'milestone1',
             milestoneTitle: 'Complete first 10 lessons',
             milestoneDescription: 'Finished the basic introduction to Spanish grammar and vocabulary',
-            timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 days ago
+            timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
             likes: [],
             comments: [
               {
@@ -192,7 +288,7 @@ export const SocialProvider: React.FC<{children: React.ReactNode}> = ({ children
             milestoneTitle: 'Complete 10k training run',
             milestoneDescription: 'Finished a 10k run in 55 minutes - feeling stronger every day!',
             imageUri: 'https://images.unsplash.com/photo-1594737625785-a6cbdabd333c?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxzZWFyY2h8Mnx8cnVubmluZ3xlbnwwfHwwfHw%3D',
-            timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 days ago
+            timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
             likes: [MOCK_USERS[0].uid],
             comments: [
               {
@@ -214,7 +310,7 @@ export const SocialProvider: React.FC<{children: React.ReactNode}> = ({ children
             milestoneTitle: 'Play first song',
             milestoneDescription: 'Successfully played "Wonderwall" all the way through!',
             imageUri: 'https://images.unsplash.com/photo-1525201548942-d8732f6617a0?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-            timestamp: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days ago
+            timestamp: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
             likes: [MOCK_USERS[0].uid, MOCK_USERS[1].uid],
             comments: []
           },
@@ -227,7 +323,7 @@ export const SocialProvider: React.FC<{children: React.ReactNode}> = ({ children
             milestoneId: 'milestone4',
             milestoneTitle: 'Finish book #10',
             milestoneDescription: 'Just finished "Atomic Habits" - highly recommend!',
-            timestamp: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(), // 10 days ago
+            timestamp: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
             likes: [],
             comments: [
               {
@@ -248,18 +344,11 @@ export const SocialProvider: React.FC<{children: React.ReactNode}> = ({ children
           }
         ];
 
-        setFriends(mockFriends);
-        setIncomingRequests(mockIncomingRequests);
         setFeedUpdates(mockFeedUpdates);
-
-        // Store in AsyncStorage
-        await AsyncStorage.setItem('friends', JSON.stringify(mockFriends));
-        await AsyncStorage.setItem('incomingRequests', JSON.stringify(mockIncomingRequests));
         await AsyncStorage.setItem('feedUpdates', JSON.stringify(mockFeedUpdates));
       }
     } catch (error) {
-      console.error('Error loading social data:', error);
-      Alert.alert('Error', 'Failed to load social data');
+      console.error('Error loading mock feed data:', error);
     }
   };
 
@@ -269,13 +358,12 @@ export const SocialProvider: React.FC<{children: React.ReactNode}> = ({ children
       await AsyncStorage.setItem('friends', JSON.stringify(friends));
       await AsyncStorage.setItem('incomingRequests', JSON.stringify(incomingRequests));
       await AsyncStorage.setItem('outgoingRequests', JSON.stringify(outgoingRequests));
-      await AsyncStorage.setItem('feedUpdates', JSON.stringify(feedUpdates));
     } catch (error) {
       console.error('Error saving social data:', error);
     }
   };
 
-  // Search for users
+  // Search for users (keeping mock implementation)
   const searchUsers = async (query: string): Promise<User[]> => {
     // In a real app, this would be an API call
     return MOCK_USERS.filter(
@@ -286,7 +374,7 @@ export const SocialProvider: React.FC<{children: React.ReactNode}> = ({ children
     );
   };
 
-  // Friend requests
+  // Friend requests (keeping mock implementation for now)
   const sendFriendRequest = async (userId: string): Promise<void> => {
     const targetUser = MOCK_USERS.find(u => u.uid === userId);
     if (!targetUser || !user) return;
@@ -335,7 +423,7 @@ export const SocialProvider: React.FC<{children: React.ReactNode}> = ({ children
     await saveSocialData();
   };
 
-  // Feed updates
+  // Feed updates - Now using backend API
   const addMilestoneCompletionUpdate = async (data: {
     goalId: string;
     goalTitle: string;
@@ -344,78 +432,165 @@ export const SocialProvider: React.FC<{children: React.ReactNode}> = ({ children
     milestoneDescription?: string;
     imageUri?: string;
   }): Promise<void> => {
-    if (!user) return;
+    try {
+      if (!user) return;
 
-    const newUpdate: MilestoneUpdate = {
-      id: uuidv4(),
-      userId: user.uid || '',
-      displayName: user.displayName || 'user',
-      goalId: data.goalId,
-      goalTitle: data.goalTitle,
-      milestoneId: data.milestoneId,
-      milestoneTitle: data.milestoneTitle,
-      milestoneDescription: data.milestoneDescription,
-      imageUri: data.imageUri,
-      timestamp: new Date().toISOString(),
-      likes: [],
-      comments: [],
-    };
+      // Create post via API
+      const postData = {
+        content: {
+          text: `Completed milestone: ${data.milestoneTitle}`,
+          imageUrl: data.imageUri
+        },
+        milestone: {
+          goalId: data.goalId,
+          goalTitle: data.goalTitle,
+          milestoneId: data.milestoneId,
+          milestoneTitle: data.milestoneTitle,
+          milestoneDescription: data.milestoneDescription
+        },
+        postType: 'milestone'
+      };
 
-    setFeedUpdates([newUpdate, ...feedUpdates]);
-    await saveSocialData();
+      const response = await apiRequest('/posts', {
+        method: 'POST',
+        body: JSON.stringify(postData)
+      });
+
+      if (response.success) {
+        // Add to local state immediately for instant UI update
+        const newUpdate: MilestoneUpdate = {
+          id: response.data.id,
+          userId: user.uid || '',
+          displayName: user.displayName || 'user',
+          goalId: data.goalId,
+          goalTitle: data.goalTitle,
+          milestoneId: data.milestoneId,
+          milestoneTitle: data.milestoneTitle,
+          milestoneDescription: data.milestoneDescription,
+          imageUri: data.imageUri,
+          timestamp: response.data.timestamp,
+          likes: [],
+          comments: [],
+          postType: 'milestone'
+        };
+
+        setFeedUpdates(prev => [newUpdate, ...prev]);
+      }
+    } catch (error) {
+      console.error('Error creating milestone post:', error);
+      // Fallback to local storage
+      const newUpdate: MilestoneUpdate = {
+        id: uuidv4(),
+        userId: user?.uid || '',
+        displayName: user?.displayName || 'user',
+        goalId: data.goalId,
+        goalTitle: data.goalTitle,
+        milestoneId: data.milestoneId,
+        milestoneTitle: data.milestoneTitle,
+        milestoneDescription: data.milestoneDescription,
+        imageUri: data.imageUri,
+        timestamp: new Date().toISOString(),
+        likes: [],
+        comments: [],
+      };
+
+      setFeedUpdates(prev => [newUpdate, ...prev]);
+    }
   };
 
   const likeFeedItem = async (updateId: string): Promise<void> => {
-    if (!user) return;
+    try {
+      if (!user) return;
 
-    setFeedUpdates(
-      feedUpdates.map(update => {
-        if (update.id === updateId && !update.likes.includes(user.uid)) {
-          return { ...update, likes: [...update.likes, user.uid] };
-        }
-        return update;
-      })
-    );
-    await saveSocialData();
+      // Optimistic update
+      setFeedUpdates(prev =>
+        prev.map(update => {
+          if (update.id === updateId && !update.likes.includes(user.uid)) {
+            return { ...update, likes: [...update.likes, user.uid] };
+          }
+          return update;
+        })
+      );
+
+      // API call
+      await apiRequest(`/posts/${updateId}/like`, {
+        method: 'PATCH'
+      });
+
+    } catch (error) {
+      console.error('Error liking post:', error);
+      // Revert optimistic update on error
+      setFeedUpdates(prev =>
+        prev.map(update => {
+          if (update.id === updateId) {
+            return { ...update, likes: update.likes.filter(id => id !== user?.uid) };
+          }
+          return update;
+        })
+      );
+    }
   };
 
   const unlikeFeedItem = async (updateId: string): Promise<void> => {
-    if (!user) return;
+    try {
+      if (!user) return;
 
-    setFeedUpdates(
-      feedUpdates.map(update => {
-        if (update.id === updateId) {
-          return { ...update, likes: update.likes.filter(id => id !== user.uid) };
-        }
-        return update;
-      })
-    );
-    await saveSocialData();
+      // Optimistic update
+      setFeedUpdates(prev =>
+        prev.map(update => {
+          if (update.id === updateId) {
+            return { ...update, likes: update.likes.filter(id => id !== user.uid) };
+          }
+          return update;
+        })
+      );
+
+      // API call
+      await apiRequest(`/posts/${updateId}/like`, {
+        method: 'PATCH'
+      });
+
+    } catch (error) {
+      console.error('Error unliking post:', error);
+      // Revert optimistic update on error
+      setFeedUpdates(prev =>
+        prev.map(update => {
+          if (update.id === updateId && !update.likes.includes(user.uid)) {
+            return { ...update, likes: [...update.likes, user.uid] };
+          }
+          return update;
+        })
+      );
+    }
   };
 
   const addComment = async (updateId: string, text: string): Promise<void> => {
-    if (!user || !text.trim()) return;
+    try {
+      if (!user || !text.trim()) return;
 
-    const newComment: Comment = {
-      id: uuidv4(),
-      userId: user.uid || '',
-      displayName: user.displayName || 'user',
-      text: text.trim(),
-      timestamp: new Date().toISOString(),
-    };
+      const response = await apiRequest(`/posts/${updateId}/comment`, {
+        method: 'POST',
+        body: JSON.stringify({ text: text.trim() })
+      });
 
-    setFeedUpdates(
-      feedUpdates.map(update => {
-        if (update.id === updateId) {
-          return {
-            ...update,
-            comments: [...update.comments, newComment]
-          };
-        }
-        return update;
-      })
-    );
-    await saveSocialData();
+      if (response.success) {
+        // Update local state with new comment
+        setFeedUpdates(prev =>
+          prev.map(update => {
+            if (update.id === updateId) {
+              return {
+                ...update,
+                comments: [...update.comments, response.data.comment]
+              };
+            }
+            return update;
+          })
+        );
+      }
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      Alert.alert('Error', 'Failed to add comment. Please try again.');
+    }
   };
 
   const deleteComment = async (updateId: string, commentId: string): Promise<void> => {
@@ -432,7 +607,6 @@ export const SocialProvider: React.FC<{children: React.ReactNode}> = ({ children
         return update;
       })
     );
-    await saveSocialData();
   };
 
   // Utility functions
@@ -450,6 +624,8 @@ export const SocialProvider: React.FC<{children: React.ReactNode}> = ({ children
     incomingRequests,
     outgoingRequests,
     feedUpdates,
+    loading,
+    error,
     searchUsers,
     sendFriendRequest,
     acceptFriendRequest,
@@ -460,6 +636,7 @@ export const SocialProvider: React.FC<{children: React.ReactNode}> = ({ children
     unlikeFeedItem,
     addComment,
     deleteComment,
+    refreshFeed,
     getFriendCount,
     getIncomingRequestCount,
   };
