@@ -26,7 +26,23 @@ const auth = async (req, res, next) => {
     next();
   } catch (error) {
     console.error('Auth middleware error:', error.message);
-    res.status(401).json({ message: 'Token is not valid' });
+    
+    // Provide more specific error messages for debugging
+    let errorMessage = 'Token is not valid';
+    if (error.name === 'TokenExpiredError') {
+      errorMessage = 'Token has expired';
+      console.log('💡 AUTH: Token expired, user needs to login again');
+    } else if (error.name === 'JsonWebTokenError') {
+      errorMessage = 'Invalid token signature';
+      console.log('💡 AUTH: Invalid signature - likely using old token with different JWT secret');
+    } else if (error.name === 'NotBeforeError') {
+      errorMessage = 'Token not active yet';
+    }
+    
+    res.status(401).json({ 
+      message: errorMessage,
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 

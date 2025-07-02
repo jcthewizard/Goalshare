@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Alert, ScrollView, SafeAreaView, Platform, StatusBar, TouchableOpacity, ActivityIndicator, Animated } from 'react-native';
 import { TextInput, Button, Title, Switch, Text, Surface } from 'react-native-paper';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -10,9 +10,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { format } from 'date-fns';
 
-type Props = StackScreenProps<RootStackParamList, 'AddGoal'>;
+type Props = StackScreenProps<RootStackParamList, 'EditGoal'>;
 
-const AddGoalScreen: React.FC<Props> = ({ navigation }) => {
+const EditGoalScreen: React.FC<Props> = ({ route, navigation }) => {
+  const { goalId } = route.params;
+  const { goalState, updateGoal } = useGoals();
+  const goal = goalState.goals.find((g) => g.id === goalId);
+
   const [title, setTitle] = useState('');
   const [targetDate, setTargetDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -21,11 +25,23 @@ const AddGoalScreen: React.FC<Props> = ({ navigation }) => {
   const [showIOSDatePicker, setShowIOSDatePicker] = useState(false);
   const [buttonScale] = useState(new Animated.Value(1));
 
-  const { addGoal } = useGoals();
+  // Pre-populate form with existing goal data
+  useEffect(() => {
+    if (goal) {
+      setTitle(goal.title || '');
+      setTargetDate(goal.targetDate ? new Date(goal.targetDate) : null);
+      setIsPinned(goal.isPinned || false);
+    }
+  }, [goal]);
 
   const handleSave = async () => {
     if (!title) {
       Alert.alert('Error', 'Please enter a goal title');
+      return;
+    }
+
+    if (!goal) {
+      Alert.alert('Error', 'Goal not found');
       return;
     }
 
@@ -38,12 +54,12 @@ const AddGoalScreen: React.FC<Props> = ({ navigation }) => {
         isPinned,
       };
 
-      await addGoal(goalData);
+      await updateGoal(goal.id, goalData);
 
       // Navigate back directly without showing an alert
       navigation.goBack();
     } catch (error) {
-      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to create goal');
+      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to update goal');
       setLoading(false);
     }
   };
@@ -91,6 +107,14 @@ const AddGoalScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
+  if (!goal) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>Goal not found</Text>
+      </View>
+    );
+  }
+
   return (
     <LinearGradient
       colors={['#F0F4FF', '#E6EEFF']}
@@ -100,8 +124,8 @@ const AddGoalScreen: React.FC<Props> = ({ navigation }) => {
         <ScrollView style={styles.container} contentContainerStyle={styles.scrollContainer}>
           <Surface style={styles.formContainer}>
             <View style={styles.headerContainer}>
-              <FontAwesome5 name="bullseye" size={30} color="#FF5F5F" style={styles.icon} />
-              <Title style={styles.title}>New Goal</Title>
+              <FontAwesome5 name="edit" size={30} color="#FF5F5F" style={styles.icon} />
+              <Title style={styles.title}>Edit Goal</Title>
             </View>
 
             <TextInput
@@ -215,7 +239,7 @@ const AddGoalScreen: React.FC<Props> = ({ navigation }) => {
                   <ActivityIndicator color="white" size="small" />
                 ) : (
                   <Text style={{ color: 'white', fontSize: 16, fontWeight: '600' }}>
-                    Create Goal
+                    Update Goal
                   </Text>
                 )}
               </TouchableOpacity>
@@ -383,6 +407,12 @@ const styles = StyleSheet.create({
   arrowButton: {
     padding: 10,
   },
+  errorText: {
+    textAlign: 'center',
+    fontSize: 18,
+    marginTop: 40,
+    color: '#666',
+  },
 });
 
-export default AddGoalScreen;
+export default EditGoalScreen; 

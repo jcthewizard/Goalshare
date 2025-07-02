@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -23,17 +23,30 @@ import { RootStackParamList } from '../navigation';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-type Props = StackScreenProps<RootStackParamList, 'AddMilestone'>;
+type Props = StackScreenProps<RootStackParamList, 'EditMilestone'>;
 
-const AddMilestoneScreen: React.FC<Props> = ({ route, navigation }) => {
-  const { goalId } = route.params;
+const EditMilestoneScreen: React.FC<Props> = ({ route, navigation }) => {
+  const { goalId, milestoneId } = route.params;
+  const { goalState, updateMilestone } = useGoals();
+  const goal = goalState.goals.find((g) => g.id === goalId);
+  const milestone = goal?.milestones?.find((m) => m.id === milestoneId);
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [image, setImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [isMilestone, setIsMilestone] = useState(false);
-  const { addMilestone } = useGoals();
   const theme = useTheme();
+
+  // Pre-populate form with existing milestone data
+  useEffect(() => {
+    if (milestone) {
+      setTitle(milestone.title || '');
+      setDescription(milestone.description || '');
+      setImage(milestone.imageUri || null);
+      setIsMilestone(milestone.isMilestone || false);
+    }
+  }, [milestone]);
 
   // Request camera permissions
   const requestCameraPermission = async () => {
@@ -106,10 +119,15 @@ const AddMilestoneScreen: React.FC<Props> = ({ route, navigation }) => {
       return;
     }
 
+    if (!milestone || !goal) {
+      Alert.alert('Error', 'Milestone or goal not found');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      await addMilestone(goalId, {
+      await updateMilestone(goalId, milestoneId, {
         title,
         description,
         imageUri: image || undefined,
@@ -123,6 +141,14 @@ const AddMilestoneScreen: React.FC<Props> = ({ route, navigation }) => {
     }
   };
 
+  if (!goal || !milestone) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>Milestone not found</Text>
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Header with back button */}
@@ -134,7 +160,7 @@ const AddMilestoneScreen: React.FC<Props> = ({ route, navigation }) => {
           style={styles.backButton}
           color={theme.colors.primary}
         />
-        <Text style={styles.headerTitle}>New Step</Text>
+        <Text style={styles.headerTitle}>Edit Step</Text>
       </View>
 
       <ScrollView
@@ -196,7 +222,7 @@ const AddMilestoneScreen: React.FC<Props> = ({ route, navigation }) => {
 
         {/* Photo Section */}
         <View style={styles.photoSection}>
-          <Text style={styles.sectionTitle}>Add a Photo</Text>
+          <Text style={styles.sectionTitle}>Update Photo</Text>
           <Text style={styles.sectionSubtitle}>Capture your progress with a photo!</Text>
 
           {image ? (
@@ -259,9 +285,9 @@ const AddMilestoneScreen: React.FC<Props> = ({ route, navigation }) => {
             disabled={loading}
           >
             {loading ? (
-              <Text style={styles.saveButtonText}>Saving...</Text>
+              <Text style={styles.saveButtonText}>Updating...</Text>
             ) : (
-              <Text style={styles.saveButtonText}>Save Step</Text>
+              <Text style={styles.saveButtonText}>Update Step</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -441,6 +467,12 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 2,
   },
+  errorText: {
+    textAlign: 'center',
+    fontSize: 18,
+    marginTop: 40,
+    color: '#666',
+  },
 });
 
-export default AddMilestoneScreen;
+export default EditMilestoneScreen; 

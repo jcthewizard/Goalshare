@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, SafeAreaView, TouchableOpacity, Animated, Easing, Platform, StatusBar, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, SafeAreaView, TouchableOpacity, Animated, Easing, Platform, StatusBar, Alert, TouchableWithoutFeedback } from 'react-native';
 import { FAB, Card, Title, Paragraph, useTheme, Avatar, IconButton, Surface } from 'react-native-paper';
 import { useGoals } from '../contexts/GoalContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -122,6 +122,7 @@ const styles = StyleSheet.create({
   listContent: {
     padding: 16,
     paddingBottom: 100,
+    overflow: 'visible',
   },
   headerContainer: {
     marginBottom: 16,
@@ -155,6 +156,7 @@ const styles = StyleSheet.create({
   },
   goalCardContent: {
     padding: 16,
+    overflow: 'visible',
   },
   goalTitleRow: {
     flexDirection: 'row',
@@ -262,9 +264,65 @@ const styles = StyleSheet.create({
   goalActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    overflow: 'visible',
   },
-  deleteGoalButton: {
+  dropdownContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    overflow: 'visible',
+  },
+  dropdownButton: {
+    padding: 8,
+  },
+  dropdownMenu: {
+    position: 'absolute',
+    right: 0,
+    top: 32,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    minWidth: 160,
+    zIndex: 10000,
+    overflow: 'visible',
+  },
+  dropdownOption: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 8,
+    marginHorizontal: 4,
+  },
+  dropdownOptionText: {
     marginLeft: 8,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  dropdownSeparator: {
+    height: 1,
+    backgroundColor: '#e0e0e0',
+    marginVertical: 4,
+    marginHorizontal: 8,
+  },
+  dropdownOverlay: {
+    position: 'absolute',
+    backgroundColor: 'white',
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    minWidth: 160,
+    zIndex: 10000,
   },
 });
 
@@ -336,11 +394,14 @@ const ListHeaderComponent = ({ user }) => (
 // Define HomeScreen as a separate function to fix return type error
 function HomeScreen({ navigation }: Props): React.ReactElement {
   const goalContext = useGoals();
-  const { deleteGoal } = useGoals();
+  const { deleteGoal, updateGoal } = useGoals();
   const goals = goalContext.goalState ? goalContext.goalState.goals : [];
   const { user } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<{[key: string]: {top: number, right: number, position: 'below' | 'above'}}>({});
   const fabAnim = useRef(new Animated.Value(1)).current;
+  const dropdownAnim = useRef(new Animated.Value(0)).current;
   const theme = useTheme();
 
   useFocusEffect(
@@ -399,6 +460,103 @@ function HomeScreen({ navigation }: Props): React.ReactElement {
     );
   };
 
+  // Pin/Unpin handler
+  const handleTogglePin = async (goalId: string, currentPinStatus: boolean): Promise<void> => {
+    try {
+      await updateGoal(goalId, { isPinned: !currentPinStatus });
+    } catch (error) {
+      Alert.alert("Error", "Failed to update goal pin status. Please try again.");
+    }
+  };
+
+  // Complete Goal handler
+  const handleCompleteGoal = (goalId: string, goalTitle: string): void => {
+    Alert.alert(
+      "Complete Goal",
+      `Are you sure you want to mark "${goalTitle}" as completed? This will celebrate your achievement!`,
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Complete",
+          style: "default",
+          onPress: async () => {
+            try {
+              await updateGoal(goalId, { isCompleted: true, completedDate: new Date() });
+            } catch (error) {
+              Alert.alert("Error", "Failed to complete goal. Please try again.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  // Close dropdown with animation
+  const closeDropdown = () => {
+    if (activeDropdown) {
+      Animated.spring(dropdownAnim, {
+        toValue: 0,
+        tension: 100,
+        friction: 8,
+        useNativeDriver: true,
+      }).start(() => {
+        setActiveDropdown(null);
+      });
+    }
+  };
+
+  // Toggle dropdown for goal actions
+  const toggleDropdown = (goalId: string, index: number) => {
+    if (activeDropdown === goalId) {
+      // Close dropdown with spring animation
+      closeDropdown();
+    } else {
+      // Close any open dropdown first
+      if (activeDropdown) {
+        setActiveDropdown(null);
+        dropdownAnim.setValue(0);
+      }
+      
+      // Determine if dropdown should appear above or below based on position in list
+      const totalGoals = goals.length;
+      const shouldShowAbove = index >= Math.floor(totalGoals / 2) && index >= totalGoals - 3;
+      
+      // Calculate approximate position based on index and card height
+      const headerHeight = 220; // Approximate header height
+      const cardHeight = 160; // Approximate card height including margins
+      const cardSpacing = 16;
+      const estimatedTop = headerHeight + (index * (cardHeight + cardSpacing)) + 60;
+      
+      setDropdownPosition(prev => ({
+        ...prev,
+        [goalId]: {
+          top: shouldShowAbove ? estimatedTop - 200 : estimatedTop,
+          right: 16,
+          position: shouldShowAbove ? 'above' : 'below'
+        }
+      }));
+      
+      // Open dropdown with spring animation
+      setActiveDropdown(goalId);
+      Animated.spring(dropdownAnim, {
+        toValue: 1,
+        tension: 80,
+        friction: 6,
+        useNativeDriver: true,
+      }).start();
+
+      // Auto-close dropdown after 10 seconds
+      setTimeout(() => {
+        if (activeDropdown === goalId) {
+          closeDropdown();
+        }
+      }, 10000);
+    }
+  };
+
   const renderItem = ({ item, index }) => {
     // Calculate completion percentage
     const totalMilestones = item.milestones ? item.milestones.length : 0;
@@ -433,15 +591,18 @@ function HomeScreen({ navigation }: Props): React.ReactElement {
                 {item.isPinned && (
                   <FontAwesome5 name="thumbtack" size={14} color="#FFF" style={styles.pinnedIcon} />
                 )}
-                <TouchableOpacity
-                  style={styles.deleteGoalButton}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    handleDeleteGoal(item.id, item.title);
-                  }}
-                >
-                  <FontAwesome5 name="trash" size={14} color="rgba(255, 255, 255, 0.8)" />
-                </TouchableOpacity>
+                <View style={styles.dropdownContainer}>
+                  <TouchableOpacity
+                    style={styles.dropdownButton}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      toggleDropdown(item.id, index);
+                    }}
+                  >
+                    <FontAwesome5 name="ellipsis-h" size={16} color="rgba(255, 255, 255, 0.8)" />
+                  </TouchableOpacity>
+
+                </View>
               </View>
             </View>
 
@@ -493,38 +654,151 @@ function HomeScreen({ navigation }: Props): React.ReactElement {
       style={styles.gradient}
     >
       <SafeAreaView style={styles.safeArea}>
-        <FlatList
-          data={goals ? goals.sort((a, b) => (b.isPinned || 0) - (a.isPinned || 0)) : []}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={[styles.listContent, { paddingBottom: 120 }]}
-          ListHeaderComponent={<ListHeaderComponent user={user} />}
-          ListEmptyComponent={ListEmptyComponent}
-          onRefresh={handleRefresh}
-          refreshing={refreshing}
-          showsVerticalScrollIndicator={false}
-        />
+        <TouchableWithoutFeedback onPress={closeDropdown} disabled={!activeDropdown}>
+          <View style={{ flex: 1 }}>
+            <FlatList
+              data={goals ? goals.sort((a, b) => (b.isPinned || 0) - (a.isPinned || 0)) : []}
+              renderItem={renderItem}
+              keyExtractor={(item) => item.id.toString()}
+              contentContainerStyle={[styles.listContent, { paddingBottom: 120 }]}
+              ListHeaderComponent={<ListHeaderComponent user={user} />}
+              ListEmptyComponent={ListEmptyComponent}
+              onRefresh={handleRefresh}
+              refreshing={refreshing}
+              showsVerticalScrollIndicator={false}
+              onScroll={() => closeDropdown()}
+              scrollEventThrottle={100}
+            />
 
-        <Animated.View
-          style={[
-            styles.fabContainer,
-            {
-              transform: [{ scale: fabAnim }]
-            }
-          ]}
-        >
-          <TouchableOpacity
-            onPress={() => navigation.navigate('AddGoal')}
-            activeOpacity={0.8}
-          >
-            <LinearGradient
-              colors={['#FF5F5F', '#FF8C8C']}
-              style={styles.fab}
+            {/* Global Dropdown Overlay */}
+            {activeDropdown && dropdownPosition[activeDropdown] && (
+              <Animated.View style={[
+                styles.dropdownOverlay,
+                {
+                  top: dropdownPosition[activeDropdown].top,
+                  right: dropdownPosition[activeDropdown].right,
+                  opacity: dropdownAnim,
+                  transform: [
+                    {
+                      scale: dropdownAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.3, 1],
+                      })
+                    },
+                    {
+                      translateY: dropdownAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [dropdownPosition[activeDropdown].position === 'above' ? 5 : -5, 0],
+                      })
+                    }
+                  ]
+                }
+              ]}>
+                <TouchableOpacity
+                  style={styles.dropdownOption}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    const goalData = goals.find(g => g.id === activeDropdown);
+                    console.log('✅ Completing goal:', activeDropdown, goalData?.title);
+                    closeDropdown();
+                    setTimeout(() => {
+                      if (goalData) {
+                        handleCompleteGoal(activeDropdown, goalData.title);
+                      }
+                    }, 200);
+                  }}
+                >
+                  <FontAwesome5 name="check-circle" size={14} color="#4CAF50" />
+                  <Text style={[styles.dropdownOptionText, { color: '#4CAF50' }]}>Complete Goal</Text>
+                </TouchableOpacity>
+                
+                <View style={styles.dropdownSeparator} />
+                
+                <TouchableOpacity
+                  style={styles.dropdownOption}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    console.log('✏️ Editing goal:', activeDropdown);
+                    closeDropdown();
+                    setTimeout(() => {
+                      navigation.navigate('EditGoal', { goalId: activeDropdown });
+                    }, 200);
+                  }}
+                >
+                  <FontAwesome5 name="edit" size={14} color="#666" />
+                  <Text style={styles.dropdownOptionText}>Edit Goal</Text>
+                </TouchableOpacity>
+                
+                <View style={styles.dropdownSeparator} />
+                
+                <TouchableOpacity
+                  style={styles.dropdownOption}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    const goalData = goals.find(g => g.id === activeDropdown);
+                    console.log('📌 Toggling pin for goal:', activeDropdown, 'Current pin status:', goalData?.isPinned);
+                    closeDropdown();
+                    setTimeout(() => {
+                      if (goalData) {
+                        handleTogglePin(activeDropdown, goalData.isPinned);
+                      }
+                    }, 200);
+                  }}
+                >
+                  <FontAwesome5 
+                    name="thumbtack" 
+                    size={14} 
+                    color={goals.find(g => g.id === activeDropdown)?.isPinned ? "#FF8C00" : "#666"} 
+                  />
+                  <Text style={[styles.dropdownOptionText, { color: goals.find(g => g.id === activeDropdown)?.isPinned ? "#FF8C00" : "#666" }]}>
+                    {goals.find(g => g.id === activeDropdown)?.isPinned ? "Unpin Goal" : "Pin Goal"}
+                  </Text>
+                </TouchableOpacity>
+                
+                <View style={styles.dropdownSeparator} />
+                
+                <TouchableOpacity
+                  style={styles.dropdownOption}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    const goalData = goals.find(g => g.id === activeDropdown);
+                    console.log('🗑️ Deleting goal:', activeDropdown, goalData?.title);
+                    closeDropdown();
+                    setTimeout(() => {
+                      if (goalData) {
+                        handleDeleteGoal(activeDropdown, goalData.title);
+                      }
+                    }, 200);
+                  }}
+                >
+                  <FontAwesome5 name="trash-alt" size={14} color="#FF3B30" />
+                  <Text style={[styles.dropdownOptionText, { color: '#FF3B30' }]}>Delete Goal</Text>
+                </TouchableOpacity>
+              </Animated.View>
+            )}
+
+            <Animated.View
+              style={[
+                styles.fabContainer,
+                {
+                  transform: [{ scale: fabAnim }]
+                }
+              ]}
             >
-              <FontAwesome5 name="plus" size={24} color="#FFF" />
-            </LinearGradient>
-          </TouchableOpacity>
-        </Animated.View>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('AddGoal')}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={['#FF5F5F', '#FF8C8C']}
+                  style={styles.fab}
+                >
+                  <FontAwesome5 name="plus" size={24} color="#FFF" />
+                </LinearGradient>
+              </TouchableOpacity>
+            </Animated.View>
+          </View>
+        </TouchableWithoutFeedback>
       </SafeAreaView>
     </LinearGradient>
   );

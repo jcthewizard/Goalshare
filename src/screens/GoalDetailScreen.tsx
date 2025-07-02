@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { Card, Title, Paragraph, Checkbox, useTheme, IconButton } from 'react-native-paper';
 import { useGoals } from '../contexts/GoalContext';
+import { ThemeColors } from '../types';
 
 import { useAuth } from '../contexts/AuthContext';
 import { StackScreenProps } from '@react-navigation/stack';
@@ -33,17 +34,20 @@ type Props = StackScreenProps<RootStackParamList, 'GoalDetail'>;
 
 const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.ReactElement => {
   const { goalId } = route.params;
-  const { goalState, getGoals, toggleMilestoneCompletion, deleteGoal, deleteMilestone } = useGoals();
+  const { goalState, getGoals, toggleMilestoneCompletion, deleteGoal, deleteMilestone, updateGoal } = useGoals();
   const { user } = useAuth();
   const [goal, setGoal] = useState(goalState.goals.find((g) => g.id === goalId) || null);
   const [animatedValues, setAnimatedValues] = useState<{[key: string]: Animated.Value}>({});
   const [showColorPicker, setShowColorPicker] = useState(false);
-  const [themeColors, setThemeColors] = useState({
+  const [themeColors, setThemeColors] = useState<ThemeColors>({
     primary: '#FF5F5F',
     secondary: '#FF8C8C',
     accent: '#FFD700'
   });
   const [currentPage, setCurrentPage] = useState(0);
+  const [isScreenSliding, setIsScreenSliding] = useState(false);
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const dropdownAnim = useRef(new Animated.Value(0)).current;
   const colorPickerAnim = useRef(new Animated.Value(0)).current;
   const theme = useTheme();
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -333,13 +337,36 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
   };
 
   // Change theme colors
-  const changeThemeColors = (primary, secondary, accent) => {
-    setThemeColors({
+  const changeThemeColors = async (primary: string, secondary: string, accent: string) => {
+    console.log('🎨 Changing theme colors:', { primary, secondary, accent });
+    
+    const newThemeColors = {
       primary,
       secondary,
       accent
-    });
+    };
+    
+    // Update state immediately for instant UI feedback
+    setThemeColors(newThemeColors);
+    console.log('🎨 Theme colors updated in state:', newThemeColors);
     toggleColorPicker();
+    
+    // For now, just keep it in local state until database issues are resolved
+    // TODO: Re-enable database saving once backend is stable
+    /*
+    if (goal) {
+      try {
+        console.log('💾 Saving theme colors to database for goal:', goal.id);
+        updateGoal(goal.id, { themeColors: newThemeColors }).then(() => {
+          console.log('✅ Theme colors saved successfully');
+        }).catch((error) => {
+          console.error('❌ Error saving theme colors:', error);
+        });
+      } catch (error) {
+        console.error('❌ Error saving theme colors:', error);
+      }
+    }
+    */
   };
 
   // NEW: function to handle page transition
@@ -357,10 +384,67 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
     setCurrentPage(pageIndex);
   };
 
+  // Close dropdown with animation
+  const closeDropdown = () => {
+    if (activeDropdown) {
+      Animated.spring(dropdownAnim, {
+        toValue: 0,
+        tension: 100,
+        friction: 8,
+        useNativeDriver: true,
+      }).start(() => {
+        setActiveDropdown(null);
+      });
+    }
+  };
+
+  // Toggle dropdown for milestone actions
+  const toggleDropdown = (milestoneId: string) => {
+    if (activeDropdown === milestoneId) {
+      // Close dropdown with spring animation
+      closeDropdown();
+    } else {
+      // Close any open dropdown first
+      if (activeDropdown) {
+        setActiveDropdown(null);
+        dropdownAnim.setValue(0);
+      }
+      // Open dropdown with spring animation
+      setActiveDropdown(milestoneId);
+      Animated.spring(dropdownAnim, {
+        toValue: 1,
+        tension: 80,
+        friction: 6,
+        useNativeDriver: true,
+      }).start();
+
+      // Auto-close dropdown after 10 seconds
+      setTimeout(() => {
+        if (activeDropdown === milestoneId) {
+          closeDropdown();
+        }
+      }, 10000);
+    }
+  };
+
   // Create a pan gesture handler for swiping between pages
   const panGesture = Gesture.Pan()
     .runOnJS(true)  // Add this to ensure the callbacks run on the JS thread
+    .onTouchesDown((e) => {
+      // Only activate page gesture if NOT starting from the left edge (to avoid conflicts with screen slide gesture)
+      // AND if screen is not currently being slid
+      const startX = e.changedTouches[0].x;
+      if (startX <= 50 || isScreenSliding) {
+        return false; // Don't handle page switching if starting from left edge or screen is sliding
+      }
+      return true;
+    })
     .onUpdate((e) => {
+      // Don't update page position if screen is sliding
+      if (isScreenSliding) {
+        return;
+      }
+      
       // During active gesture, directly follow finger position
       const dragX = e.translationX;
 
@@ -373,6 +457,11 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
       pageTranslateX.setValue(newPosition);
     })
     .onEnd((e) => {
+      // Don't process page switching if screen is sliding
+      if (isScreenSliding) {
+        return;
+      }
+      
       // When gesture ends, decide whether to snap to next page or return to current
       const dragX = e.translationX;
       const dragVelocity = e.velocityX;
@@ -406,6 +495,105 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
       setCurrentPage(targetPage);
     });
 
+  // Animation value for screen slide gesture
+  const screenTranslateX = useRef(new Animated.Value(0)).current;
+
+  // Track if the gesture should be allowed based on start position
+  const gestureStartPosition = useRef({ x: 0, shouldAllow: false });
+
+  // Create a pan gesture handler for screen slide dismissal
+  // This allows users to drag from anywhere along the left edge to dismiss the screen
+  const screenSlideGesture = Gesture.Pan()
+    .runOnJS(true)
+    .activeOffsetX(5) // Gesture becomes active after 5 points of horizontal movement
+    .failOffsetY([-100, 100]) // Allow more vertical movement before failing the gesture
+    .shouldCancelWhenOutside(false) // Don't cancel when finger moves outside
+    .onBegin((e) => {
+      // Store the start position for filtering
+      gestureStartPosition.current = {
+        x: e.x,
+        shouldAllow: e.x <= 50 // Only allow if starting within 50 pixels of left edge (removed y restriction)
+      };
+      
+      // Set screen sliding state if gesture is allowed
+      if (gestureStartPosition.current.shouldAllow) {
+        setIsScreenSliding(true);
+      }
+    })
+    .onUpdate((e) => {
+      // Only respond if the gesture started from the correct area and is a rightward swipe
+      if (gestureStartPosition.current.shouldAllow && e.translationX > 0) {
+        // Update screen position in real-time, with some resistance
+        const translateX = Math.min(e.translationX * 1, SCREEN_WIDTH);
+        screenTranslateX.setValue(translateX);
+        
+        // Add subtle opacity effect based on drag progress
+        const progress = Math.min(translateX / (SCREEN_WIDTH * 0.6), 1);
+        fadeAnim.setValue(1 - progress * 0.2);
+      }
+    })
+    .onEnd((e) => {
+      // Only process end if the gesture was allowed
+      if (!gestureStartPosition.current.shouldAllow) {
+        return;
+      }
+
+      const dragX = e.translationX;
+      const dragVelocity = e.velocityX;
+      
+      // Threshold for dismissing the screen (40% of screen width or fast velocity)
+      const dismissThreshold = SCREEN_WIDTH * 0.4;
+      const shouldDismiss = (dragX > dismissThreshold) || (dragVelocity > 800);
+
+      if (shouldDismiss) {
+        // Animate screen out to the right and navigate back
+        Animated.parallel([
+          Animated.timing(screenTranslateX, {
+            toValue: SCREEN_WIDTH,
+            duration: 250,
+            useNativeDriver: true,
+            easing: Easing.out(Easing.cubic),
+          }),
+          Animated.timing(fadeAnim, {
+            toValue: 0,
+            duration: 250,
+            useNativeDriver: true,
+            easing: Easing.out(Easing.cubic),
+          }),
+        ]).start(() => {
+          navigation.goBack();
+        });
+      } else {
+        // Snap back to original position
+        Animated.parallel([
+          Animated.spring(screenTranslateX, {
+            toValue: 0,
+            tension: 300,
+            friction: 30,
+            useNativeDriver: true,
+          }),
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+            easing: Easing.out(Easing.cubic),
+          }),
+        ]).start(() => {
+          // Reset screen sliding state when animation completes
+          setIsScreenSliding(false);
+        });
+      }
+      
+      // Reset screen sliding state when gesture ends (for cases where animation doesn't run)
+      if (!gestureStartPosition.current.shouldAllow) {
+        setIsScreenSliding(false);
+      }
+    })
+    .onFinalize(() => {
+      // Always reset screen sliding state when gesture is finalized
+      setIsScreenSliding(false);
+    });
+
   if (!goal) {
     return (
       <View style={styles.container}>
@@ -430,320 +618,321 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
 
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* Header with back button */}
-      <View style={[styles.header, { paddingHorizontal: 16, marginHorizontal: 0 }]}>
-        <TouchableOpacity
-          style={styles.backButtonContainer}
-          onPress={() => navigation.goBack()}
-        >
-          <FontAwesome5 name="arrow-left" size={18} color={theme.colors.primary} />
-        </TouchableOpacity>
-
-        <View style={{ flex: 1 }} /> {/* Spacer */}
-
-        <View style={styles.colorPickerContainer}>
-          {/* Color options */}
-          <Animated.View style={[
-            styles.colorOptions,
-            {
-              opacity: colorPickerAnim,
-              transform: [{
-                translateX: colorPickerAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [30, 0]
-                })
-              },
-              {
-                scale: colorPickerAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.8, 1]
-                })
-              }]
-            }
-          ]}>
-            {/* Delete Goal Button - now part of the animated list */}
+    <Animated.View style={[
+      styles.container, 
+      { backgroundColor: 'transparent' }, // Fully transparent to show HomeScreen behind
+      { transform: [{ translateX: screenTranslateX }] }
+    ]}>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <GestureDetector gesture={Gesture.Simultaneous(screenSlideGesture, panGesture)}>
+        <SafeAreaView style={[styles.screenContainer, { backgroundColor: theme.colors.background, marginLeft: 0, marginRight: 0 }]}>
+          {/* Header with back button */}
+          <View style={[styles.header, { paddingHorizontal: 16, marginHorizontal: 0 }]}>
             <TouchableOpacity
-              style={[
-                styles.colorOption, 
-                { 
-                  backgroundColor: '#D3D3D3',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }
-              ]}
-              onPress={handleDeleteGoal}
+              style={styles.backButtonContainer}
+              onPress={() => navigation.goBack()}
             >
-              <FontAwesome5 name="trash" size={14} color="red" />
+              <FontAwesome5 name="arrow-left" size={18} color={theme.colors.primary} />
             </TouchableOpacity>
-            
-            {/* Red theme */}
-            <TouchableOpacity
-              style={[styles.colorOption, { backgroundColor: '#FF5F5F' }]}
-              onPress={() => changeThemeColors('#FF5F5F', '#FF8C8C', '#FFD700')}
-            />
-            {/* Blue theme */}
-            <TouchableOpacity
-              style={[styles.colorOption, { backgroundColor: '#35CAFC' }]}
-              onPress={() => changeThemeColors('#35CAFC', '#70D6FF', '#FFD700')}
-            />
-            {/* Purple theme */}
-            <TouchableOpacity
-              style={[styles.colorOption, { backgroundColor: '#9C27B0' }]}
-              onPress={() => changeThemeColors('#9C27B0', '#BA68C8', '#E1BEE7')}
-            />
-            {/* Green theme */}
-            <TouchableOpacity
-              style={[styles.colorOption, { backgroundColor: '#4CAF50' }]}
-              onPress={() => changeThemeColors('#4CAF50', '#81C784', '#C8E6C9')}
-            />
-            {/* Orange theme */}
-            <TouchableOpacity
-              style={[styles.colorOption, { backgroundColor: '#FFA500' }]}
-              onPress={() => changeThemeColors('#FF9800', '#FFCC80', '#FFE082')}
-            />
-          </Animated.View>
 
-          {/* Color wheel button */}
-          <TouchableOpacity
-            style={[
-              styles.headerActionButton,
-              showColorPicker ? {backgroundColor: '#f0f0f0'} : null
-            ]}
-            onPress={toggleColorPicker}
-          >
-            <FontAwesome5 name="palette" size={18} color={showColorPicker ? themeColors.primary : "#777"} />
-          </TouchableOpacity>
-        </View>
-      </View>
+            <View style={{ flex: 1 }} /> {/* Spacer */}
 
-      {/* Goal Card with Gradient - always visible at the top */}
-      <Animated.View style={{
-        opacity: fadeAnim,
-        transform: [{ translateY: cardTranslateY }],
-        marginTop: 0,
-        marginHorizontal: 16,
-      }}>
-        <LinearGradient
-          colors={[themeColors.primary, themeColors.secondary]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.goalCard}
-        >
-          <View style={styles.goalCardContent}>
-            <View style={styles.goalCardHeader}>
-              <Text style={styles.goalCardTitle}>{goal.title}</Text>
-              <View style={styles.dateContainer}>
-                <FontAwesome5 name="calendar-alt" size={14} color="#FFF" style={{ marginRight: 6 }} />
-                <Text style={styles.goalInfoText}>
-                  {goal.targetDate ? format(new Date(goal.targetDate), 'MMM d, yyyy') : 'No target date'}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.progressContainer}>
-              <Text style={styles.progressLabel}>
-                Progress: {completedMilestones}/{totalMilestones} ({progressPercentage}%)
-              </Text>
-              <View style={styles.progressBarContainer}>
-                <View
-                  style={[
-                    styles.progressBarFill,
-                    { width: `${progressPercentage}%` }
-                  ]}
+            <View style={styles.colorPickerContainer}>
+              {/* Color options */}
+              <Animated.View style={[
+                styles.colorOptions,
+                {
+                  opacity: colorPickerAnim,
+                  transform: [{
+                    translateX: colorPickerAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [30, 0]
+                    })
+                  },
+                  {
+                    scale: colorPickerAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.8, 1]
+                    })
+                  }]
+                }
+              ]}>
+                {/* Red theme */}
+                <TouchableOpacity
+                  style={[styles.colorOption, { backgroundColor: '#FF5F5F' }]}
+                  onPress={() => changeThemeColors('#FF5F5F', '#FF8C8C', '#FFD700')}
                 />
-              </View>
+                {/* Blue theme */}
+                <TouchableOpacity
+                  style={[styles.colorOption, { backgroundColor: '#35CAFC' }]}
+                  onPress={() => changeThemeColors('#35CAFC', '#70D6FF', '#FFD700')}
+                />
+                {/* Purple theme */}
+                <TouchableOpacity
+                  style={[styles.colorOption, { backgroundColor: '#9C27B0' }]}
+                  onPress={() => changeThemeColors('#9C27B0', '#BA68C8', '#E1BEE7')}
+                />
+                {/* Green theme */}
+                <TouchableOpacity
+                  style={[styles.colorOption, { backgroundColor: '#4CAF50' }]}
+                  onPress={() => changeThemeColors('#4CAF50', '#81C784', '#C8E6C9')}
+                />
+                {/* Orange theme */}
+                <TouchableOpacity
+                  style={[styles.colorOption, { backgroundColor: '#FFA500' }]}
+                  onPress={() => changeThemeColors('#FF9800', '#FFCC80', '#FFE082')}
+                />
+              </Animated.View>
+
+              {/* Color wheel button */}
+              <TouchableOpacity
+                style={[
+                  styles.headerActionButton,
+                  showColorPicker ? {backgroundColor: '#f0f0f0'} : null
+                ]}
+                onPress={toggleColorPicker}
+              >
+                <FontAwesome5 name="palette" size={18} color={showColorPicker ? themeColors.primary : "#777"} />
+              </TouchableOpacity>
             </View>
           </View>
-        </LinearGradient>
-      </Animated.View>
 
-      {/* Swipeable Content Container */}
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <GestureDetector gesture={panGesture}>
-          <Animated.View style={{ flex: 1 }}>
-            <Animated.View style={[styles.pagesContainer, {
-              width: SCREEN_WIDTH * 2,
-              transform: [{ translateX: pageTranslateX }]
-            }]}>
-              {/* Steps Page */}
-              <View style={[styles.page, { width: SCREEN_WIDTH }]}>
-                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {/* Goal Card with Gradient - always visible at the top */}
+          <Animated.View style={{
+            opacity: fadeAnim,
+            transform: [{ translateY: cardTranslateY }],
+            marginTop: 0,
+            marginHorizontal: 16,
+          }}>
+            <LinearGradient
+              colors={[themeColors.primary, themeColors.secondary]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.goalCard}
+            >
+              <View style={styles.goalCardContent}>
+                <View style={styles.goalCardHeader}>
+                  <Text style={styles.goalCardTitle}>{goal.title}</Text>
+                  <View style={styles.dateContainer}>
+                    <FontAwesome5 name="calendar-alt" size={14} color="#FFF" style={{ marginRight: 6 }} />
+                    <Text style={styles.goalInfoText}>
+                      {goal.targetDate ? format(new Date(goal.targetDate), 'MMM d, yyyy') : 'No target date'}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.progressContainer}>
+                  <Text style={styles.progressLabel}>
+                    Progress: {completedMilestones}/{totalMilestones} ({progressPercentage}%)
+                  </Text>
+                  <View style={styles.progressBarContainer}>
+                    <View
+                      style={[
+                        styles.progressBarFill,
+                        { width: `${progressPercentage}%` }
+                      ]}
+                    />
+                  </View>
+                </View>
+              </View>
+            </LinearGradient>
+          </Animated.View>
+
+
+
+
+
+          {/* Swipeable Content Container */}
+            <Animated.View style={{ flex: 1 }}>
+              <Animated.View style={[styles.pagesContainer, {
+                width: SCREEN_WIDTH * 2,
+                transform: [{ translateX: pageTranslateX }]
+              }]}>
+                {/* Steps Page */}
+                <View style={[styles.page, { width: SCREEN_WIDTH }]}>
+                  <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                   <View style={styles.stepsSection}>
                     <Text style={styles.sectionTitle}>Steps to Complete</Text>
-                    {stepsToComplete.length === 0 ? (
-                      <View>
-                        <Text style={styles.emptyStateText}>All steps completed! 🎉</Text>
-                        <TouchableOpacity
-                          style={styles.addStepButton}
-                          onPress={() => navigation.navigate('AddMilestone', { goalId: goal.id })}
+                  {stepsToComplete.length === 0 ? (
+                    <View>
+                      <Text style={styles.emptyStateText}>All steps completed! 🎉</Text>
+                      <TouchableOpacity
+                        style={styles.addStepButton}
+                        onPress={() => navigation.navigate('AddMilestone', { goalId: goal.id })}
+                      >
+                        <Ionicons name="add" size={16} color="#35CAFC" />
+                        <Text style={styles.addStepText}>Add New Step</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={styles.simpleStepsContainer}>
+                      {stepsToComplete.map((step, index) => (
+                        <Animated.View 
+                          key={step.id}
+                          style={{
+                            opacity: stepAnimations[step.id] || 1,
+                            transform: [
+                              {
+                                scale: stepAnimations[step.id]?.interpolate({
+                                  inputRange: [0, 1],
+                                  outputRange: [0.8, 1],
+                                }) || 1
+                              },
+                              {
+                                translateY: stepAnimations[step.id]?.interpolate({
+                                  inputRange: [0, 1],
+                                  outputRange: [20, 0],
+                                }) || 0
+                              }
+                            ]
+                          }}
                         >
-                          <Ionicons name="add" size={16} color="#35CAFC" />
-                          <Text style={styles.addStepText}>Add New Step</Text>
-                        </TouchableOpacity>
-                      </View>
-                    ) : (
-                      <View style={styles.simpleStepsContainer}>
-                        {stepsToComplete.map((step, index) => (
-                          <Animated.View 
-                            key={step.id}
-                            style={{
-                              opacity: stepAnimations[step.id] || 1,
-                              transform: [
-                                {
-                                  scale: stepAnimations[step.id]?.interpolate({
-                                    inputRange: [0, 1],
-                                    outputRange: [0.8, 1],
-                                  }) || 1
-                                },
-                                {
-                                  translateY: stepAnimations[step.id]?.interpolate({
-                                    inputRange: [0, 1],
-                                    outputRange: [20, 0],
-                                  }) || 0
-                                }
-                              ]
-                            }}
+                          <TouchableOpacity
+                            style={styles.stepContainer}
+                            onPress={() => handleCompleteMilestone(step.id, step.completed)}
+                            activeOpacity={0.7}
                           >
-                            <TouchableOpacity
-                              style={styles.stepContainer}
-                              onPress={() => handleCompleteMilestone(step.id, step.completed)}
-                              activeOpacity={0.7}
-                            >
-                              <View style={styles.stepRow}>
-                                {/* Checkbox */}
-                                <TouchableOpacity
-                                  style={[
-                                    styles.checkbox,
-                                    step.priority === 'milestone' ? styles.milestoneCheckbox : styles.stepCheckbox,
-                                    step.completed ? [
-                                      styles.checkboxCompleted,
-                                      step.priority === 'milestone' ? { backgroundColor: '#FFD700', borderColor: '#FFD700' } : null
-                                    ] : null
-                                  ]}
-                                  onPress={() => handleCompleteMilestone(step.id, step.completed)}
-                                  activeOpacity={0.7}
-                                >
-                                  {step.completed ? (
-                                    <Ionicons 
-                                      name="checkmark" 
-                                      size={16} 
-                                      color="white" 
-                                    />
-                                  ) : null}
-                                </TouchableOpacity>
-
-                                {/* Step Content */}
-                                <View style={styles.stepContent}>
-                                  <Text style={styles.stepTitle}>{step.title}</Text>
-                                  {step.description ? (
-                                    <Text style={styles.stepDescription}>{step.description}</Text>
-                                  ) : null}
-                                </View>
-
-                                {/* Milestone Badge */}
-                                {step.priority === 'milestone' ? (
-                                  <View style={styles.milestoneBadge}>
-                                    <Ionicons name="star" size={16} color="#FFD700" />
-                                  </View>
+                            <View style={styles.stepRow}>
+                              {/* Checkbox */}
+                              <TouchableOpacity
+                                style={[
+                                  styles.checkbox,
+                                  step.priority === 'milestone' ? styles.milestoneCheckbox : styles.stepCheckbox,
+                                  step.completed ? [
+                                    styles.checkboxCompleted,
+                                    step.priority === 'milestone' ? { backgroundColor: '#FFD700', borderColor: '#FFD700' } : null
+                                  ] : null
+                                ]}
+                                onPress={() => handleCompleteMilestone(step.id, step.completed)}
+                                activeOpacity={0.7}
+                              >
+                                {step.completed ? (
+                                  <Ionicons 
+                                    name="checkmark" 
+                                    size={16} 
+                                    color="white" 
+                                  />
                                 ) : null}
+                              </TouchableOpacity>
 
-                                {/* Delete Button */}
-                                <TouchableOpacity
-                                  style={styles.deleteButton}
-                                  onPress={() => handleDeleteMilestone(step.id, step.title)}
-                                  activeOpacity={0.7}
-                                >
-                                  <FontAwesome5 name="trash" size={16} color="#FF3B30" />
-                                </TouchableOpacity>
+                              {/* Step Content */}
+                              <View style={styles.stepContent}>
+                                <Text style={styles.stepTitle}>{step.title}</Text>
+                                {step.description ? (
+                                  <Text style={styles.stepDescription}>{step.description}</Text>
+                                ) : null}
                               </View>
-                            </TouchableOpacity>
-                          </Animated.View>
-                        ))}
-                        
-                        {/* Add Step Button */}
-                        <TouchableOpacity
-                          style={styles.addStepButton}
-                          onPress={() => navigation.navigate('AddMilestone', { goalId: goal.id })}
-                        >
-                          <Ionicons name="add" size={16} color="#35CAFC" />
-                          <Text style={styles.addStepText}>Add New Step</Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                  </View>
-                </ScrollView>
-              </View>
+
+                              {/* Milestone Badge */}
+                              {step.priority === 'milestone' ? (
+                                <View style={styles.milestoneBadge}>
+                                  <Ionicons name="star" size={16} color="#FFD700" />
+                                </View>
+                              ) : null}
+
+                              {/* Delete Button */}
+                              <TouchableOpacity
+                                style={styles.deleteButton}
+                                onPress={() => handleDeleteMilestone(step.id, step.title)}
+                                activeOpacity={0.7}
+                              >
+                                <FontAwesome5 name="trash" size={16} color="#FF3B30" />
+                              </TouchableOpacity>
+                            </View>
+                          </TouchableOpacity>
+                        </Animated.View>
+                      ))}
+                      
+                      {/* Add Step Button */}
+                      <TouchableOpacity
+                        style={styles.addStepButton}
+                        onPress={() => navigation.navigate('AddMilestone', { goalId: goal.id })}
+                      >
+                        <Ionicons name="add" size={16} color="#35CAFC" />
+                        <Text style={styles.addStepText}>Add New Step</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+                  </ScrollView>
+                </View>
 
               {/* Timeline Page */}
               <View style={[styles.page, { width: SCREEN_WIDTH }]}>
-                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                  <View style={styles.timelineSection}>
-                    <Text style={[styles.sectionTitle, { marginTop: 0 }]}>Timeline</Text>
+                <ScrollView 
+                  contentContainerStyle={styles.scrollContent} 
+                  showsVerticalScrollIndicator={true}
+                  bounces={true}
+                  alwaysBounceVertical={false}
+                  onScroll={() => closeDropdown()}
+                  scrollEventThrottle={100}
+                >
+                <View style={styles.timelineSection}>
+                  <Text style={[styles.sectionTitle, { marginTop: 0 }]}>Timeline</Text>
 
-                    {completedSteps.length === 0 ? (
-                      <Text style={styles.emptyStateText}>Complete steps to see your progress here</Text>
-                    ) : (
-                      <View style={styles.timelineContainer}>
-                        {completedSteps.map((milestone, index) => {
-                          // Get pre-created animation values for this milestone
-                          const animations = milestoneAnimRefs.current[milestone.id] || {
-                            fade: new Animated.Value(1),
-                            translateY: new Animated.Value(0)
-                          };
+                  {completedSteps.length === 0 ? (
+                    <Text style={styles.emptyStateText}>Complete steps to see your progress here</Text>
+                  ) : (
+                    <View style={styles.timelineContainer}>
+                      {completedSteps.map((milestone, index) => {
+                        // Get pre-created animation values for this milestone
+                        const animations = milestoneAnimRefs.current[milestone.id] || {
+                          fade: new Animated.Value(1),
+                          translateY: new Animated.Value(0)
+                        };
 
-                          return (
-                            <Animated.View key={milestone.id}
-                              style={[
-                                styles.timelineItem,
-                                {
-                                  opacity: animations.fade,
-                                  transform: [{ translateY: animations.translateY }]
-                                }
-                              ]}
-                            >
-                              {/* Timeline connector - show only if not the last item */}
-                              {index < completedSteps.length - 1 ? (
-                                <View style={styles.timelineConnector} />
+                        return (
+                          <Animated.View key={milestone.id}
+                            style={[
+                              styles.timelineItem,
+                              {
+                                opacity: animations.fade,
+                                transform: [{ translateY: animations.translateY }]
+                              }
+                            ]}
+                          >
+                            {/* Timeline connector - show only if not the last item */}
+                            {index < completedSteps.length - 1 ? (
+                              <View style={styles.timelineConnector} />
+                            ) : null}
+
+                            {/* Milestone node */}
+                            <Animated.View style={[
+                              styles.timelineNode,
+                              milestone.isMilestone ? styles.milestoneTimelineNode : null,
+                              {
+                                backgroundColor: milestone.isMilestone ? themeColors.accent : themeColors.primary
+                              }
+                            ]}>
+                              {milestone.isMilestone ? (
+                                <Animated.View style={[
+                                  styles.shimmerOverlay,
+                                  {
+                                    opacity: shimmerAnim.interpolate({
+                                      inputRange: [0, 0.5, 1],
+                                      outputRange: [0.1, 0.3, 0.1]
+                                    })
+                                  }
+                                ]} />
                               ) : null}
+                              {milestone.isMilestone ? (
+                                <FontAwesome5 name="star" size={16} color={themeColors.accent} />
+                              ) : (
+                                <FontAwesome5 name="check" size={14} color="#FFF" />
+                              )}
+                            </Animated.View>
 
-                              {/* Milestone node */}
-                              <Animated.View style={[
-                                styles.timelineNode,
-                                milestone.isMilestone ? styles.milestoneTimelineNode : null,
-                                {
-                                  backgroundColor: milestone.isMilestone ? themeColors.accent : themeColors.primary
-                                }
-                              ]}>
-                                {milestone.isMilestone ? (
-                                  <Animated.View style={[
-                                    styles.shimmerOverlay,
-                                    {
-                                      opacity: shimmerAnim.interpolate({
-                                        inputRange: [0, 0.5, 1],
-                                        outputRange: [0.1, 0.3, 0.1]
-                                      })
-                                    }
-                                  ]} />
-                                ) : null}
-                                {milestone.isMilestone ? (
-                                  <FontAwesome5 name="star" size={16} color={themeColors.accent} />
-                                ) : (
-                                  <FontAwesome5 name="check" size={14} color="#FFF" />
-                                )}
-                              </Animated.View>
-
-                              {/* Milestone content */}
-                              <Card style={[
-                                styles.milestoneCard,
-                                milestone.isMilestone ? [
-                                  styles.milestoneTimelineCard,
-                                  { borderLeftColor: themeColors.accent }
-                                ] : null
-                              ]}>
-                                {milestone.isMilestone ? (
-                                  <>
-                                                        <LinearGradient
+                            {/* Milestone content */}
+                            <Card style={[
+                              styles.milestoneCard,
+                              milestone.isMilestone ? [
+                                styles.milestoneTimelineCard,
+                                { borderLeftColor: themeColors.accent }
+                              ] : null
+                            ]}>
+                              {milestone.isMilestone ? (
+                                <>
+                                                      <LinearGradient
                       colors={[themeColors.accent + '20', '#FFFCF3']}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
@@ -804,61 +993,186 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                                       </Animated.View>
                                     </View>
                                   </>
-                                ) : null}
-                                <Card.Content>
-                                  <View style={styles.milestoneHeader}>
-                                    <Title style={[
-                                      styles.milestoneTitle,
-                                      milestone.isMilestone ? { color: themeColors.accent } : null
-                                    ]}>
-                                      {milestone.title}
-                                    </Title>
-                                    <View style={styles.milestoneActions}>
+                              ) : null}
+                              <Card.Content>
+                                <View style={styles.milestoneHeader}>
+                                  <Title style={[
+                                    styles.milestoneTitle,
+                                    milestone.isMilestone ? { color: themeColors.accent } : null
+                                  ]}>
+                                    {milestone.title}
+                                  </Title>
+                                  <View style={styles.milestoneActions}>
+                                    <View style={styles.dropdownContainer}>
                                       <TouchableOpacity
-                                        style={[styles.deleteButton, { marginRight: 8 }]}
-                                        onPress={() => handleDeleteMilestone(milestone.id, milestone.title)}
+                                        style={styles.dropdownButton}
+                                        onPress={() => toggleDropdown(milestone.id)}
                                       >
-                                        <FontAwesome5 name="trash" size={16} color="#FF3B30" />
+                                        <Ionicons name="ellipsis-horizontal" size={20} color="#666" />
                                       </TouchableOpacity>
-                                      <TouchableOpacity
-                                        style={[styles.checkboxContainer, styles.checkboxCompleted]}
-                                        onPress={() => handleCompleteMilestone(milestone.id, milestone.completed)}
-                                      >
-                                        <FontAwesome5 name="check" size={14} color="#FFF" />
-                                      </TouchableOpacity>
+                                      
+                                      {activeDropdown === milestone.id && (
+                                        <Animated.View style={[
+                                          styles.dropdownMenu,
+                                          {
+                                            opacity: dropdownAnim,
+                                            transform: [
+                                              {
+                                                scale: dropdownAnim.interpolate({
+                                                  inputRange: [0, 1],
+                                                  outputRange: [0.3, 1],
+                                                })
+                                              },
+                                              {
+                                                translateY: dropdownAnim.interpolate({
+                                                  inputRange: [0, 1],
+                                                  outputRange: [-5, 0],
+                                                })
+                                              }
+                                            ]
+                                          }
+                                        ]}>
+                                          <TouchableOpacity
+                                            style={styles.dropdownOption}
+                                            onPress={() => {
+                                              console.log('✏️ Editing milestone:', milestone.id);
+                                              closeDropdown();
+                                              setTimeout(() => {
+                                                navigation.navigate('EditMilestone', { goalId: goal.id, milestoneId: milestone.id });
+                                              }, 200);
+                                            }}
+                                          >
+                                            <Ionicons name="create-outline" size={16} color="#666" />
+                                            <Text style={styles.dropdownOptionText}>Edit Step</Text>
+                                          </TouchableOpacity>
+                                          
+                                          <View style={styles.dropdownSeparator} />
+                                          
+                                          <TouchableOpacity
+                                            style={styles.dropdownOption}
+                                            onPress={() => {
+                                              // For uncompleting, we need to pass false to set completed to false
+                                              console.log('🔄 Uncompleting milestone:', milestone.id, 'Current status:', milestone.completed);
+                                              console.log('🎯 Goal exists:', !!goal, 'Goal ID:', goal?.id);
+                                              if (goal) {
+                                                // Call toggleMilestoneCompletion directly with false to uncomplete
+                                                console.log('🔄 Calling toggleMilestoneCompletion with false');
+                                                toggleMilestoneCompletion(goal.id, milestone.id, false)
+                                                  .then(() => {
+                                                    console.log('✅ Successfully uncompleted milestone');
+                                                    // Close dropdown after successful operation
+                                                    Animated.spring(dropdownAnim, {
+                                                      toValue: 0,
+                                                      tension: 100,
+                                                      friction: 8,
+                                                      useNativeDriver: true,
+                                                    }).start(() => {
+                                                      setActiveDropdown(null);
+                                                    });
+                                                  })
+                                                  .catch((error) => {
+                                                    console.error('❌ Error uncompleting milestone:', error);
+                                                    // Close dropdown even on error
+                                                    Animated.spring(dropdownAnim, {
+                                                      toValue: 0,
+                                                      tension: 100,
+                                                      friction: 8,
+                                                      useNativeDriver: true,
+                                                    }).start(() => {
+                                                      setActiveDropdown(null);
+                                                    });
+                                                  });
+                                              } else {
+                                                console.error('❌ Goal not found when trying to uncomplete milestone');
+                                                // Close dropdown if no goal
+                                                Animated.spring(dropdownAnim, {
+                                                  toValue: 0,
+                                                  tension: 100,
+                                                  friction: 8,
+                                                  useNativeDriver: true,
+                                                }).start(() => {
+                                                  setActiveDropdown(null);
+                                                });
+                                              }
+                                            }}
+                                          >
+                                            <Ionicons name="checkmark-circle-outline" size={16} color="#666" />
+                                            <Text style={styles.dropdownOptionText}>Uncomplete</Text>
+                                          </TouchableOpacity>
+                                          
+                                          <View style={styles.dropdownSeparator} />
+                                          
+                                          <TouchableOpacity
+                                            style={styles.dropdownOption}
+                                            onPress={() => {
+                                              console.log('🗑️ Deleting milestone:', milestone.id, milestone.title);
+                                              console.log('🎯 Goal exists for delete:', !!goal, 'Goal ID:', goal?.id);
+                                              if (goal) {
+                                                console.log('🗑️ Calling handleDeleteMilestone');
+                                                // Close dropdown first, then show delete confirmation
+                                                Animated.spring(dropdownAnim, {
+                                                  toValue: 0,
+                                                  tension: 100,
+                                                  friction: 8,
+                                                  useNativeDriver: true,
+                                                }).start(() => {
+                                                  setActiveDropdown(null);
+                                                  // Call delete after dropdown is closed
+                                                  handleDeleteMilestone(milestone.id, milestone.title);
+                                                });
+                                              } else {
+                                                console.error('❌ Goal not found when trying to delete milestone');
+                                                // Close dropdown if no goal
+                                                Animated.spring(dropdownAnim, {
+                                                  toValue: 0,
+                                                  tension: 100,
+                                                  friction: 8,
+                                                  useNativeDriver: true,
+                                                }).start(() => {
+                                                  setActiveDropdown(null);
+                                                });
+                                              }
+                                            }}
+                                          >
+                                            <Ionicons name="trash-outline" size={16} color="#FF3B30" />
+                                            <Text style={[styles.dropdownOptionText, { color: '#FF3B30' }]}>Delete</Text>
+                                          </TouchableOpacity>
+                                        </Animated.View>
+                                      )}
                                     </View>
                                   </View>
+                                </View>
 
-                                  {milestone.description ? (
-                                    <Paragraph style={styles.milestoneDescription}>
-                                      {milestone.description}
-                                    </Paragraph>
-                                  ) : null}
+                                {milestone.description ? (
+                                  <Paragraph style={styles.milestoneDescription}>
+                                    {milestone.description}
+                                  </Paragraph>
+                                ) : null}
 
-                                  {/* Display milestone image if available */}
-                                  {milestone.imageUri ? (
-                                    <View style={styles.imageContainer}>
-                                      <Image
-                                        source={{ uri: milestone.imageUri }}
-                                        style={styles.milestoneImage}
-                                      />
-                                    </View>
-                                  ) : null}
+                                {/* Display milestone image if available */}
+                                {milestone.imageUri ? (
+                                  <View style={styles.imageContainer}>
+                                    <Image
+                                      source={{ uri: milestone.imageUri }}
+                                      style={styles.milestoneImage}
+                                    />
+                                  </View>
+                                ) : null}
 
-                                  {/* Completion date could be added here */}
-                                  <Text style={styles.completedDate}>
-                                    Completed {format(new Date(), 'MMM d, yyyy')}
-                                  </Text>
-                                </Card.Content>
-                              </Card>
-                            </Animated.View>
-                          );
-                        })}
-                      </View>
-                    )}
-                  </View>
+                                {/* Completion date could be added here */}
+                                <Text style={styles.completedDate}>
+                                  Completed {format(new Date(), 'MMM d, yyyy')}
+                                </Text>
+                              </Card.Content>
+                            </Card>
+                          </Animated.View>
+                        );
+                      })}
+                    </View>
+                  )}
+                </View>
                 </ScrollView>
-              </View>
+                </View>
             </Animated.View>
 
             {/* Page indicator dots */}
@@ -875,15 +1189,27 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
               ]} />
             </View>
           </Animated.View>
-        </GestureDetector>
-      </GestureHandlerRootView>
-    </SafeAreaView>
+        </SafeAreaView>
+      </GestureDetector>
+    </GestureHandlerRootView>
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  screenContainer: {
+    flex: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginTop: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
   header: {
     flexDirection: 'row',
@@ -911,7 +1237,7 @@ const styles = StyleSheet.create({
   colorOptions: {
     flexDirection: 'row',
     position: 'absolute',
-    right: 50,
+    right: 35,
     alignItems: 'center',
     justifyContent: 'flex-end',
     paddingRight: 10,
@@ -941,7 +1267,8 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
     paddingTop: 8,
-    paddingBottom: 40,
+    paddingBottom: 80,
+    flexGrow: 1,
   },
   notFoundText: {
     textAlign: 'center',
@@ -1017,6 +1344,7 @@ const styles = StyleSheet.create({
   },
   timelineContainer: {
     marginLeft: 8,
+    paddingBottom: 20,
   },
   timelineItem: {
     flexDirection: 'row',
@@ -1400,6 +1728,50 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  dropdownContainer: {
+    position: 'relative',
+  },
+  dropdownButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#f5f5f5',
+  },
+  dropdownMenu: {
+    position: 'absolute',
+    top: 32,
+    right: 0,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 12,
+    minWidth: 160,
+    zIndex: 1001,
+  },
+  dropdownOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginHorizontal: 4,
+  },
+  dropdownOptionText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#666',
+  },
+  dropdownSeparator: {
+    height: 1,
+    backgroundColor: '#e0e0e0',
+    marginHorizontal: 8,
+    marginVertical: 4,
+  },
+
   simpleStepsContainer: {
     width: '100%',
     alignSelf: 'center',
@@ -1470,6 +1842,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 8,
   },
+
 });
 
 export default GoalDetailScreen;

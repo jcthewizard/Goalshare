@@ -46,6 +46,20 @@ const GoalSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  themeColors: {
+    primary: {
+      type: String,
+      default: '#FF5F5F'
+    },
+    secondary: {
+      type: String,
+      default: '#FF8C8C'
+    },
+    accent: {
+      type: String,
+      default: '#FFD700'
+    }
+  },
   milestones: [MilestoneSchema],
   createdAt: {
     type: Date,

@@ -25,12 +25,19 @@ export interface Milestone {
   createdAt: string | Date;
 }
 
+export interface ThemeColors {
+  primary: string;
+  secondary: string;
+  accent: string;
+}
+
 export interface Goal {
   id: string;
   title: string;
   targetDate?: string | Date | null;
   isPinned?: boolean;
   completed?: boolean;
+  themeColors?: ThemeColors;
   milestones: Milestone[];
   createdAt: string | Date;
 }

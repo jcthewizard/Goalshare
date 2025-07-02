@@ -12,6 +12,8 @@ import ProfileScreen from '../screens/ProfileScreen';
 import GoalDetailScreen from '../screens/GoalDetailScreen';
 import AddGoalScreen from '../screens/AddGoalScreen';
 import AddMilestoneScreen from '../screens/AddMilestoneScreen';
+import EditGoalScreen from '../screens/EditGoalScreen';
+import EditMilestoneScreen from '../screens/EditMilestoneScreen';
 import { IconButton } from 'react-native-paper';
 import { Animated, StyleSheet, View, TouchableOpacity, Text, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -24,6 +26,8 @@ export type RootStackParamList = {
   GoalDetail: { goalId: string };
   AddGoal: undefined;
   AddMilestone: { goalId: string };
+  EditGoal: { goalId: string };
+  EditMilestone: { goalId: string; milestoneId: string };
 };
 
 export type AuthStackParamList = {
@@ -272,8 +276,18 @@ const Navigation = () => {
               name="GoalDetail"
               component={GoalDetailScreen}
               options={{
-                ...TransitionPresets.SlideFromRightIOS,
-                gestureResponseDistance: { horizontal: 100 }
+                presentation: 'transparentModal',
+                cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+                gestureEnabled: false, // Disable default gesture since we're using custom
+                cardStyle: { 
+                  backgroundColor: 'transparent',
+                },
+                cardOverlayEnabled: true,
+                animationEnabled: true,
+                transitionSpec: {
+                  open: customTransitionSpec.open,
+                  close: customTransitionSpec.close,
+                }
               }}
             />
             <Stack.Screen
@@ -287,6 +301,22 @@ const Navigation = () => {
             <Stack.Screen
               name="AddMilestone"
               component={AddMilestoneScreen}
+              options={{
+                ...TransitionPresets.ModalSlideFromBottomIOS,
+                gestureResponseDistance: { vertical: 200 }
+              }}
+            />
+            <Stack.Screen
+              name="EditGoal"
+              component={EditGoalScreen}
+              options={{
+                ...TransitionPresets.ModalSlideFromBottomIOS,
+                gestureResponseDistance: { vertical: 200 }
+              }}
+            />
+            <Stack.Screen
+              name="EditMilestone"
+              component={EditMilestoneScreen}
               options={{
                 ...TransitionPresets.ModalSlideFromBottomIOS,
                 gestureResponseDistance: { vertical: 200 }

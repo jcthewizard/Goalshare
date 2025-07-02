@@ -21,12 +21,17 @@ router.get('/', auth, async (req, res) => {
 // @access  Private
 router.post('/', auth, async (req, res) => {
   try {
-    const { title, targetDate, isPinned } = req.body;
+    const { title, targetDate, isPinned, themeColors } = req.body;
 
     const newGoal = new Goal({
       title,
       targetDate: targetDate || null,
       isPinned: isPinned || false,
+      themeColors: themeColors || {
+        primary: '#FF5F5F',
+        secondary: '#FF8C8C',
+        accent: '#FFD700'
+      },
       user: req.user._id
     });
 
@@ -70,7 +75,7 @@ router.get('/:id', auth, async (req, res) => {
 // @access  Private
 router.put('/:id', auth, async (req, res) => {
   try {
-    const { title, targetDate, isPinned, completed } = req.body;
+    const { title, targetDate, isPinned, completed, themeColors } = req.body;
     
     // Build goal object
     const goalFields = {};
@@ -78,6 +83,7 @@ router.put('/:id', auth, async (req, res) => {
     if (targetDate !== undefined) goalFields.targetDate = targetDate;
     if (isPinned !== undefined) goalFields.isPinned = isPinned;
     if (completed !== undefined) goalFields.completed = completed;
+    if (themeColors !== undefined) goalFields.themeColors = themeColors;
     
     let goal = await Goal.findById(req.params.id);
     
@@ -97,6 +103,7 @@ router.put('/:id', auth, async (req, res) => {
       { new: true }
     );
     
+    console.log('📤 Sending updated goal back to client:', JSON.stringify(goal, null, 2));
     res.json(goal);
   } catch (error) {
     console.error('Update goal error:', error);

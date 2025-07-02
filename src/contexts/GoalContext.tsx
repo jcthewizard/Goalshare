@@ -190,6 +190,11 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
         targetDate: goal.targetDate,
         isPinned: goal.isPinned,
         completed: goal.completed,
+        themeColors: goal.themeColors || {
+          primary: '#FF5F5F',
+          secondary: '#FF8C8C',
+          accent: '#FFD700'
+        },
         milestones: goal.milestones.map((m: any) => ({
           id: m._id,
           title: m.title,
@@ -222,6 +227,11 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
         targetDate: res.data.targetDate,
         isPinned: res.data.isPinned,
         completed: res.data.completed,
+        themeColors: res.data.themeColors || {
+          primary: '#FF5F5F',
+          secondary: '#FF8C8C',
+          accent: '#FFD700'
+        },
         milestones: res.data.milestones.map((m: any) => ({
           id: m._id,
           title: m.title,
@@ -256,6 +266,11 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
         targetDate: res.data.targetDate,
         isPinned: res.data.isPinned,
         completed: res.data.completed,
+        themeColors: res.data.themeColors || {
+          primary: '#FF5F5F',
+          secondary: '#FF8C8C',
+          accent: '#FFD700'
+        },
         milestones: res.data.milestones?.map((m: any) => ({
           id: m._id,
           title: m.title,
@@ -280,8 +295,10 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Update an existing goal
   const updateGoal = async (id: string, goal: Partial<Goal>): Promise<Goal> => {
     try {
+      console.log('🔄 Updating goal:', id, 'with data:', goal);
       dispatch({ type: 'SET_LOADING', payload: true });
       const res = await axios.put(`${API_URL}/goals/${id}`, goal);
+      console.log('📥 Update goal response:', res.data);
       
       // Transform backend format to frontend format
       const transformedGoal = {
@@ -290,6 +307,11 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
         targetDate: res.data.targetDate,
         isPinned: res.data.isPinned,
         completed: res.data.completed,
+        themeColors: res.data.themeColors || {
+          primary: '#FF5F5F',
+          secondary: '#FF8C8C',
+          accent: '#FFD700'
+        },
         milestones: res.data.milestones?.map((m: any) => ({
           id: m._id,
           title: m.title,
