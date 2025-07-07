@@ -11,6 +11,7 @@ import { FontAwesome5 } from '@expo/vector-icons';
 import { Goal } from '../types';
 import { useFocusEffect } from '@react-navigation/native';
 import GoalCard from '../components/GoalCard';
+import { Ionicons } from '@expo/vector-icons';
 
 type Props = StackScreenProps<MainTabParamList, 'Home'>;
 
@@ -324,6 +325,25 @@ const styles = StyleSheet.create({
     minWidth: 160,
     zIndex: 10000,
   },
+  completedGoalsSection: {
+    marginTop: 20,
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+  },
+  completedGoalsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  completedGoalsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+  },
+  completedGoalsContainer: {
+    overflow: 'hidden',
+  },
 });
 
 // Daily Quote Component with improved design
@@ -400,9 +420,15 @@ function HomeScreen({ navigation }: Props): React.ReactElement {
   const [refreshing, setRefreshing] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [dropdownPosition, setDropdownPosition] = useState<{[key: string]: {top: number, right: number, position: 'below' | 'above'}}>({});
+  const [showCompletedGoals, setShowCompletedGoals] = useState(false);
   const fabAnim = useRef(new Animated.Value(1)).current;
   const dropdownAnim = useRef(new Animated.Value(0)).current;
+  const completedDropdownAnim = useRef(new Animated.Value(0)).current;
   const theme = useTheme();
+
+  // Filter goals into active and completed
+  const activeGoals = goals.filter(g => !g.isCompleted).sort((a, b) => (b.isPinned || 0) - (a.isPinned || 0));
+  const completedGoals = goals.filter(g => g.isCompleted);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -559,9 +585,9 @@ function HomeScreen({ navigation }: Props): React.ReactElement {
 
   const renderItem = ({ item, index }) => {
     // Calculate completion percentage
-    const totalMilestones = item.milestones ? item.milestones.length : 0;
-    const completedMilestones = item.milestones ? item.milestones.filter(m => m.completed).length : 0;
-    const completionPercentage = totalMilestones ? Math.round((completedMilestones / totalMilestones) * 100) : 0;
+    const totalMilestones = (item.milestones?.length || 0) + (item.timeline?.length || 0);
+    const completedMilestones = item.timeline?.length || 0;
+    const completionPercentage = totalMilestones > 0 ? Math.round((completedMilestones / totalMilestones) * 100) : 0;
 
     // Get gradient colors based on index
     const gradientColors = [
@@ -574,6 +600,7 @@ function HomeScreen({ navigation }: Props): React.ReactElement {
 
     return (
       <TouchableOpacity
+        key={item.id}
         style={styles.goalCardContainer}
         onPress={() => navigation.navigate('GoalDetail', { goalId: item.id })}
         activeOpacity={0.9}
@@ -648,6 +675,57 @@ function HomeScreen({ navigation }: Props): React.ReactElement {
     </View>
   );
 
+  // Completed goals section component
+  const CompletedGoalsSection = () => {
+    React.useEffect(() => {
+      Animated.timing(completedDropdownAnim, {
+        toValue: showCompletedGoals ? 1 : 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }, [showCompletedGoals]);
+
+    if (completedGoals.length === 0) return null;
+
+    return (
+      <View style={styles.completedGoalsSection}>
+        <TouchableOpacity 
+          style={styles.completedGoalsHeader}
+          onPress={() => setShowCompletedGoals(!showCompletedGoals)}
+        >
+          <Text style={styles.completedGoalsTitle}>Completed Goals ({completedGoals.length})</Text>
+          <Animated.View
+            style={{
+              transform: [{
+                rotate: completedDropdownAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['0deg', '180deg']
+                })
+              }]
+            }}
+          >
+            <Ionicons name="chevron-down" size={20} color="#666" />
+          </Animated.View>
+        </TouchableOpacity>
+
+        <Animated.View
+          style={[
+            styles.completedGoalsContainer,
+            {
+              maxHeight: completedDropdownAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, 1000]
+              }),
+              opacity: completedDropdownAnim
+            }
+          ]}
+        >
+          {showCompletedGoals && completedGoals.map((item, index) => renderItem({ item, index }))}
+        </Animated.View>
+      </View>
+    );
+  };
+
   return (
     <LinearGradient
       colors={['#F0F4FF', '#E6EEFF']}
@@ -657,12 +735,13 @@ function HomeScreen({ navigation }: Props): React.ReactElement {
         <TouchableWithoutFeedback onPress={closeDropdown} disabled={!activeDropdown}>
           <View style={{ flex: 1 }}>
             <FlatList
-              data={goals ? goals.sort((a, b) => (b.isPinned || 0) - (a.isPinned || 0)) : []}
+              data={activeGoals}
               renderItem={renderItem}
               keyExtractor={(item) => item.id.toString()}
               contentContainerStyle={[styles.listContent, { paddingBottom: 120 }]}
               ListHeaderComponent={<ListHeaderComponent user={user} />}
               ListEmptyComponent={ListEmptyComponent}
+              ListFooterComponent={<CompletedGoalsSection />}
               onRefresh={handleRefresh}
               refreshing={refreshing}
               showsVerticalScrollIndicator={false}
@@ -748,9 +827,9 @@ function HomeScreen({ navigation }: Props): React.ReactElement {
                   <FontAwesome5 
                     name="thumbtack" 
                     size={14} 
-                    color={goals.find(g => g.id === activeDropdown)?.isPinned ? "#FF8C00" : "#666"} 
+                    color={goals.find(g => g.id === activeDropdown)?.isPinned ? "#000000" : "#666"} 
                   />
-                  <Text style={[styles.dropdownOptionText, { color: goals.find(g => g.id === activeDropdown)?.isPinned ? "#FF8C00" : "#666" }]}>
+                  <Text style={[styles.dropdownOptionText, { color: goals.find(g => g.id === activeDropdown)?.isPinned ? "#000000" : "#666" }]}>
                     {goals.find(g => g.id === activeDropdown)?.isPinned ? "Unpin Goal" : "Pin Goal"}
                   </Text>
                 </TouchableOpacity>

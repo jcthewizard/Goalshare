@@ -29,7 +29,6 @@ const AddMilestoneScreen: React.FC<Props> = ({ route, navigation }) => {
   const { goalId } = route.params;
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [image, setImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [isMilestone, setIsMilestone] = useState(false);
   const { addMilestone } = useGoals();
@@ -69,7 +68,7 @@ const AddMilestoneScreen: React.FC<Props> = ({ route, navigation }) => {
       });
 
       if (!result.canceled) {
-        setImage(result.assets[0].uri);
+        // setImage(result.assets[0].uri); // This line is removed as per the edit hint
       }
     } catch (error) {
       Alert.alert('Camera Error', 'Failed to take photo');
@@ -91,7 +90,7 @@ const AddMilestoneScreen: React.FC<Props> = ({ route, navigation }) => {
       });
 
       if (!result.canceled) {
-        setImage(result.assets[0].uri);
+        // setImage(result.assets[0].uri); // This line is removed as per the edit hint
       }
     } catch (error) {
       Alert.alert('Photo Library Error', 'Failed to select image');
@@ -112,7 +111,6 @@ const AddMilestoneScreen: React.FC<Props> = ({ route, navigation }) => {
       await addMilestone(goalId, {
         title,
         description,
-        imageUri: image || undefined,
         isMilestone
       });
       navigation.goBack();
@@ -192,56 +190,6 @@ const AddMilestoneScreen: React.FC<Props> = ({ route, navigation }) => {
               color="#FFD700"
             />
           </View>
-        </View>
-
-        {/* Photo Section */}
-        <View style={styles.photoSection}>
-          <Text style={styles.sectionTitle}>Add a Photo</Text>
-          <Text style={styles.sectionSubtitle}>Capture your progress with a photo!</Text>
-
-          {image ? (
-            <View style={styles.imagePreviewContainer}>
-              <Image source={{ uri: image }} style={styles.imagePreview} />
-
-              {/* Image overlay with remove button */}
-              <View style={styles.imageOverlay}>
-                <TouchableOpacity
-                  style={styles.removeImageButton}
-                  onPress={() => setImage(null)}
-                >
-                  <FontAwesome5 name="trash-alt" size={16} color="#FFF" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : (
-            <View style={styles.photoOptionsContainer}>
-              <TouchableOpacity
-                style={styles.photoOptionButton}
-                onPress={takePhoto}
-              >
-                <LinearGradient
-                  colors={['#FF5F5F', '#FF8C8C']}
-                  style={styles.photoOptionGradient}
-                >
-                  <FontAwesome5 name="camera" size={24} color="#FFF" />
-                  <Text style={styles.photoOptionText}>Take Photo</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.photoOptionButton}
-                onPress={pickImage}
-              >
-                <LinearGradient
-                  colors={['#35CAFC', '#70D6FF']}
-                  style={styles.photoOptionGradient}
-                >
-                  <FontAwesome5 name="images" size={24} color="#FFF" />
-                  <Text style={styles.photoOptionText}>Choose from Library</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          )}
         </View>
 
         {/* Action Buttons */}

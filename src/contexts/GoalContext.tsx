@@ -30,6 +30,8 @@ type GoalAction =
   | { type: 'ADD_MILESTONE'; payload: { goalId: string; milestone: any } }
   | { type: 'UPDATE_MILESTONE'; payload: { goalId: string; milestoneId: string; milestone: any } }
   | { type: 'DELETE_MILESTONE'; payload: { goalId: string; milestoneId: string } }
+  | { type: 'ADD_TIMELINE_ITEM'; payload: { goalId: string; item: any } }
+  | { type: 'DELETE_TIMELINE_ITEM'; payload: { goalId: string; itemId: string } }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null };
 
@@ -44,7 +46,8 @@ interface GoalContextType {
   addMilestone: (goalId: string, milestone: any) => Promise<any>;
   updateMilestone: (goalId: string, milestoneId: string, milestone: any) => Promise<any>;
   deleteMilestone: (goalId: string, milestoneId: string) => Promise<void>;
-  toggleMilestoneCompletion: (goalId: string, milestoneId: string, isCompleted: boolean) => Promise<any>;
+  addTimelineItem: (goalId: string, item: any) => Promise<any>;
+  deleteTimelineItem: (goalId: string, itemId: string) => Promise<void>;
 }
 
 // Initial state
@@ -134,6 +137,36 @@ const goalReducer = (state: GoalState, action: GoalAction): GoalState => {
         }),
         loading: false
       };
+    case 'ADD_TIMELINE_ITEM':
+      return {
+        ...state,
+        goals: state.goals.map(goal => {
+          if (goal.id === action.payload.goalId) {
+            return {
+              ...goal,
+              timeline: [action.payload.item, ...(goal.timeline || [])]
+            };
+          }
+          return goal;
+        }),
+        loading: false
+      };
+    case 'DELETE_TIMELINE_ITEM':
+      return {
+        ...state,
+        goals: state.goals.map(goal => {
+          if (goal.id === action.payload.goalId) {
+            return {
+              ...goal,
+              timeline: (goal.timeline || []).filter(
+                item => item.id !== action.payload.itemId
+              )
+            };
+          }
+          return goal;
+        }),
+        loading: false
+      };
     case 'SET_LOADING':
       return {
         ...state,
@@ -189,7 +222,6 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
         title: goal.title,
         targetDate: goal.targetDate,
         isPinned: goal.isPinned,
-        completed: goal.completed,
         themeColors: goal.themeColors || {
           primary: '#FF5F5F',
           secondary: '#FF8C8C',
@@ -199,11 +231,18 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
           id: m._id,
           title: m.title,
           description: m.description,
-          completed: m.completed,
           imageUri: m.imageUri,
           isMilestone: m.isMilestone,
           createdAt: m.createdAt
         })),
+        timeline: goal.timeline?.map((t: any) => ({
+          id: t._id,
+          title: t.title,
+          description: t.description,
+          imageUri: t.imageUri,
+          isMilestone: t.isMilestone,
+          createdAt: t.createdAt
+        })) || [],
         createdAt: goal.createdAt
       }));
       
@@ -226,7 +265,6 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
         title: res.data.title,
         targetDate: res.data.targetDate,
         isPinned: res.data.isPinned,
-        completed: res.data.completed,
         themeColors: res.data.themeColors || {
           primary: '#FF5F5F',
           secondary: '#FF8C8C',
@@ -236,11 +274,18 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
           id: m._id,
           title: m.title,
           description: m.description,
-          completed: m.completed,
           imageUri: m.imageUri,
           isMilestone: m.isMilestone,
           createdAt: m.createdAt
         })),
+        timeline: res.data.timeline?.map((t: any) => ({
+          id: t._id,
+          title: t.title,
+          description: t.description,
+          imageUri: t.imageUri,
+          isMilestone: t.isMilestone,
+          createdAt: t.createdAt
+        })) || [],
         createdAt: res.data.createdAt
       };
       
@@ -265,7 +310,6 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
         title: res.data.title,
         targetDate: res.data.targetDate,
         isPinned: res.data.isPinned,
-        completed: res.data.completed,
         themeColors: res.data.themeColors || {
           primary: '#FF5F5F',
           secondary: '#FF8C8C',
@@ -275,10 +319,17 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
           id: m._id,
           title: m.title,
           description: m.description,
-          completed: m.completed,
           imageUri: m.imageUri,
           isMilestone: m.isMilestone,
           createdAt: m.createdAt
+        })) || [],
+        timeline: res.data.timeline?.map((t: any) => ({
+          id: t._id,
+          title: t.title,
+          description: t.description,
+          imageUri: t.imageUri,
+          isMilestone: t.isMilestone,
+          createdAt: t.createdAt
         })) || [],
         createdAt: res.data.createdAt
       };
@@ -306,7 +357,6 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
         title: res.data.title,
         targetDate: res.data.targetDate,
         isPinned: res.data.isPinned,
-        completed: res.data.completed,
         themeColors: res.data.themeColors || {
           primary: '#FF5F5F',
           secondary: '#FF8C8C',
@@ -316,10 +366,17 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
           id: m._id,
           title: m.title,
           description: m.description,
-          completed: m.completed,
           imageUri: m.imageUri,
           isMilestone: m.isMilestone,
           createdAt: m.createdAt
+        })) || [],
+        timeline: res.data.timeline?.map((t: any) => ({
+          id: t._id,
+          title: t.title,
+          description: t.description,
+          imageUri: t.imageUri,
+          isMilestone: t.isMilestone,
+          createdAt: t.createdAt
         })) || [],
         createdAt: res.data.createdAt
       };
@@ -357,7 +414,6 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
         id: res.data._id,
         title: res.data.title,
         description: res.data.description,
-        completed: res.data.completed,
         imageUri: res.data.imageUri,
         isMilestone: res.data.isMilestone,
         createdAt: res.data.createdAt
@@ -387,7 +443,6 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
         id: res.data._id,
         title: res.data.title,
         description: res.data.description,
-        completed: res.data.completed,
         imageUri: res.data.imageUri,
         isMilestone: res.data.isMilestone,
         createdAt: res.data.createdAt
@@ -422,12 +477,47 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Toggle milestone completion
-  const toggleMilestoneCompletion = async (goalId: string, milestoneId: string, isCompleted: boolean): Promise<any> => {
+  // Add a timeline item to a goal
+  const addTimelineItem = async (goalId: string, item: any): Promise<any> => {
     try {
-      return updateMilestone(goalId, milestoneId, { completed: isCompleted });
+      dispatch({ type: 'SET_LOADING', payload: true });
+      const res = await axios.post(`${API_URL}/goals/${goalId}/timeline`, item);
+      
+      // Transform backend format to frontend format
+      const transformedItem = {
+        id: res.data._id,
+        title: res.data.title,
+        description: res.data.description,
+        imageUri: res.data.imageUri,
+        isMilestone: res.data.isMilestone,
+        createdAt: res.data.createdAt
+      };
+      
+      dispatch({
+        type: 'ADD_TIMELINE_ITEM',
+        payload: { goalId, item: transformedItem }
+      });
+      
+      return transformedItem;
     } catch (error) {
-      console.error('Toggle milestone completion error:', error);
+      console.error('Add timeline item error:', error);
+      dispatch({ type: 'SET_ERROR', payload: 'Error adding timeline item' });
+      throw error;
+    }
+  };
+
+  // Delete a timeline item
+  const deleteTimelineItem = async (goalId: string, itemId: string): Promise<void> => {
+    try {
+      dispatch({ type: 'SET_LOADING', payload: true });
+      await axios.delete(`${API_URL}/goals/${goalId}/timeline/${itemId}`);
+      dispatch({
+        type: 'DELETE_TIMELINE_ITEM',
+        payload: { goalId, itemId }
+      });
+    } catch (error) {
+      console.error('Delete timeline item error:', error);
+      dispatch({ type: 'SET_ERROR', payload: 'Error deleting timeline item' });
       throw error;
     }
   };
@@ -444,7 +534,8 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
         addMilestone,
         updateMilestone,
         deleteMilestone,
-        toggleMilestoneCompletion
+        addTimelineItem,
+        deleteTimelineItem
       }}
     >
       {children}

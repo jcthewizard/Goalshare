@@ -19,7 +19,15 @@ export interface Milestone {
   id: string;
   title: string;
   description?: string;
-  completed: boolean;
+  imageUri?: string;
+  isMilestone?: boolean;
+  createdAt: string | Date;
+}
+
+export interface TimelineItem {
+  id: string;
+  title: string;
+  description?: string;
   imageUri?: string;
   isMilestone?: boolean;
   createdAt: string | Date;
@@ -36,9 +44,11 @@ export interface Goal {
   title: string;
   targetDate?: string | Date | null;
   isPinned?: boolean;
-  completed?: boolean;
+  isCompleted?: boolean;
+  completedDate?: string | Date | null;
   themeColors?: ThemeColors;
   milestones: Milestone[];
+  timeline?: TimelineItem[];
   createdAt: string | Date;
 }
 

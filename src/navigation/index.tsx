@@ -18,6 +18,7 @@ import { IconButton } from 'react-native-paper';
 import { Animated, StyleSheet, View, TouchableOpacity, Text, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome5 } from '@expo/vector-icons';
+import CameraScreen from '../screens/CameraScreen';
 
 // Define our navigation types
 export type RootStackParamList = {
@@ -37,6 +38,7 @@ export type AuthStackParamList = {
 
 export type MainTabParamList = {
   Home: undefined;
+  Camera: undefined;
   Profile: undefined;
 };
 
@@ -128,6 +130,8 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
             let iconName;
             if (route.name === 'Home') {
               iconName = 'home';
+            } else if (route.name === 'Camera') {
+              iconName = 'camera';
             } else if (route.name === 'Profile') {
               iconName = 'user';
             }
@@ -238,6 +242,13 @@ const MainTabNavigator = () => (
       component={HomeScreen}
       options={{
         tabBarLabel: 'Home',
+      }}
+    />
+    <Tab.Screen
+      name="Camera"
+      component={CameraScreen}
+      options={{
+        tabBarLabel: 'Capture',
       }}
     />
     <Tab.Screen

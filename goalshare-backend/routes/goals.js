@@ -165,7 +165,6 @@ router.post('/:id/milestones', auth, async (req, res) => {
     const newMilestone = {
       title,
       description: description || '',
-      completed: false,
       imageUri: imageUri || null,
       isMilestone: isMilestone || false,
       createdAt: Date.now()
@@ -189,7 +188,7 @@ router.post('/:id/milestones', auth, async (req, res) => {
 // @access  Private
 router.put('/:id/milestones/:milestone_id', auth, async (req, res) => {
   try {
-    const { title, description, completed, imageUri, isMilestone } = req.body;
+    const { title, description, imageUri, isMilestone } = req.body;
     
     const goal = await Goal.findById(req.params.id);
     
@@ -215,7 +214,6 @@ router.put('/:id/milestones/:milestone_id', auth, async (req, res) => {
     // Update milestone fields
     if (title !== undefined) goal.milestones[milestoneIndex].title = title;
     if (description !== undefined) goal.milestones[milestoneIndex].description = description;
-    if (completed !== undefined) goal.milestones[milestoneIndex].completed = completed;
     if (imageUri !== undefined) goal.milestones[milestoneIndex].imageUri = imageUri;
     if (isMilestone !== undefined) goal.milestones[milestoneIndex].isMilestone = isMilestone;
     
@@ -266,6 +264,86 @@ router.delete('/:id/milestones/:milestone_id', auth, async (req, res) => {
     console.error('Delete milestone error:', error);
     if (error.kind === 'ObjectId') {
       return res.status(404).json({ message: 'Goal or milestone not found' });
+    }
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   POST /api/goals/:id/timeline
+// @desc    Add timeline item to goal
+// @access  Private
+router.post('/:id/timeline', auth, async (req, res) => {
+  try {
+    const { title, description, imageUri, isMilestone } = req.body;
+    
+    const goal = await Goal.findById(req.params.id);
+    
+    // Check if goal exists
+    if (!goal) {
+      return res.status(404).json({ message: 'Goal not found' });
+    }
+    
+    // Make sure user owns goal
+    if (goal.user.toString() !== req.user._id.toString()) {
+      return res.status(401).json({ message: 'User not authorized' });
+    }
+    
+    const newTimelineItem = {
+      title,
+      description: description || '',
+      imageUri: imageUri || null,
+      isMilestone: isMilestone || false,
+      createdAt: Date.now()
+    };
+    
+    goal.timeline.unshift(newTimelineItem);
+    await goal.save();
+    
+    res.json(goal.timeline[0]);
+  } catch (error) {
+    console.error('Add timeline item error:', error);
+    if (error.kind === 'ObjectId') {
+      return res.status(404).json({ message: 'Goal not found' });
+    }
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   DELETE /api/goals/:id/timeline/:timeline_id
+// @desc    Delete timeline item from goal
+// @access  Private
+router.delete('/:id/timeline/:timeline_id', auth, async (req, res) => {
+  try {
+    const goal = await Goal.findById(req.params.id);
+    
+    // Check if goal exists
+    if (!goal) {
+      return res.status(404).json({ message: 'Goal not found' });
+    }
+    
+    // Make sure user owns goal
+    if (goal.user.toString() !== req.user._id.toString()) {
+      return res.status(401).json({ message: 'User not authorized' });
+    }
+    
+    // Find timeline item index
+    const timelineIndex = goal.timeline.findIndex(
+      t => t._id.toString() === req.params.timeline_id
+    );
+    
+    if (timelineIndex === -1) {
+      return res.status(404).json({ message: 'Timeline item not found' });
+    }
+    
+    // Remove timeline item
+    goal.timeline.splice(timelineIndex, 1);
+    await goal.save();
+    
+    res.json({ message: 'Timeline item removed' });
+  } catch (error) {
+    console.error('Delete timeline item error:', error);
+    if (error.kind === 'ObjectId') {
+      return res.status(404).json({ message: 'Goal or timeline item not found' });
     }
     res.status(500).json({ message: 'Server error' });
   }

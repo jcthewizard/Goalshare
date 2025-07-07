@@ -8,9 +8,26 @@ const MilestoneSchema = new mongoose.Schema({
   description: {
     type: String
   },
-  completed: {
+  imageUri: {
+    type: String
+  },
+  isMilestone: {
     type: Boolean,
     default: false
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+const TimelineItemSchema = new mongoose.Schema({
+  title: {
+    type: String,
+    required: true
+  },
+  description: {
+    type: String
   },
   imageUri: {
     type: String
@@ -61,6 +78,7 @@ const GoalSchema = new mongoose.Schema({
     }
   },
   milestones: [MilestoneSchema],
+  timeline: [TimelineItemSchema],
   createdAt: {
     type: Date,
     default: Date.now

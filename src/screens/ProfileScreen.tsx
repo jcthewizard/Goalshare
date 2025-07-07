@@ -32,15 +32,21 @@ const ProfileScreen = () => {
   const { goalState } = useGoals();
   const theme = useTheme();
 
-  const completedGoals = goalState.goals.filter(goal => goal.completed).length;
-  const totalMilestones = goalState.goals.reduce((sum, goal) => sum + goal.milestones.length, 0);
+  // Calculate stats
+  const totalGoals = goalState.goals.length;
+  const completedGoals = goalState.goals.filter(goal => goal.isCompleted).length;
+  const totalMilestones = goalState.goals.reduce(
+    (sum, goal) => sum + goal.milestones.length + (goal.timeline?.length || 0),
+    0
+  );
+  // Timeline items represent completed items
   const completedMilestones = goalState.goals.reduce(
-    (sum, goal) => sum + goal.milestones.filter(m => m.completed).length,
+    (sum, goal) => sum + (goal.timeline?.length || 0),
     0
   );
 
-  const goalCompletionRate = goalState.goals.length > 0
-    ? Math.round((completedGoals / goalState.goals.length) * 100)
+  const goalCompletionRate = totalGoals > 0
+    ? Math.round((completedGoals / totalGoals) * 100)
     : 0;
 
   const milestoneCompletionRate = totalMilestones > 0
@@ -117,7 +123,7 @@ const ProfileScreen = () => {
                 <View style={styles.statsIconContainer}>
                   <FontAwesome5 name="flag" size={22} color="#FFF" />
                 </View>
-                <Text style={styles.statsNumber}>{goalState.goals.length}</Text>
+                <Text style={styles.statsNumber}>{totalGoals}</Text>
                 <Text style={styles.statsLabel}>Total Goals</Text>
               </LinearGradient>
             </Card>
