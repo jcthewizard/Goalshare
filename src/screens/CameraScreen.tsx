@@ -108,7 +108,8 @@ export default function CameraScreen({ navigation }: Props) {
         const photo = await cameraRef.current.takePictureAsync({
           quality: 0.8,
           base64: false,
-          exif: false
+          exif: false,
+          skipProcessing: facing === 'front', // Prevent flipping for front camera
         });
 
         if (photo && photo.uri) {
@@ -296,6 +297,7 @@ export default function CameraScreen({ navigation }: Props) {
         facing={facing}
         ref={cameraRef}
         animateShutter={false}
+        mirror={facing === 'front'}
       />
       <GestureDetector gesture={doubleTap}>
         <View style={styles.cameraContainer}>
