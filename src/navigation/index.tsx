@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React from 'react';
+import React, { useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator, CardStyleInterpolators, TransitionPresets } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -9,7 +9,14 @@ import RegisterScreen from '../screens/RegisterScreen';
 import HomeScreen from '../screens/HomeScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
-import { runOnJS } from 'react-native-reanimated';
+import Animated, {
+  runOnJS,
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  interpolate,
+  Extrapolate
+} from 'react-native-reanimated';
 
 import GoalDetailScreen from '../screens/GoalDetailScreen';
 import AddGoalScreen from '../screens/AddGoalScreen';
@@ -17,10 +24,12 @@ import AddMilestoneScreen from '../screens/AddMilestoneScreen';
 import EditGoalScreen from '../screens/EditGoalScreen';
 import EditMilestoneScreen from '../screens/EditMilestoneScreen';
 import { IconButton } from 'react-native-paper';
-import { Animated, StyleSheet, View, TouchableOpacity, Text, Platform } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, Text, Platform, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome5 } from '@expo/vector-icons';
 import CameraScreen from '../screens/CameraScreen';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Define our navigation types
 export type RootStackParamList = {
@@ -222,6 +231,7 @@ const styles = StyleSheet.create({
     width: 30,
     height: 3,
     borderRadius: 3,
+    backgroundColor: '#35CAFC',
   },
   tabLabel: {
     fontSize: 12,
@@ -230,7 +240,7 @@ const styles = StyleSheet.create({
   },
 });
 
-// Hook for swipe navigation between tabs
+// Hook for swipe navigation between tabs with smooth animations
 const useSwipeNavigation = (navigation, currentTabName) => {
   const tabNames = ['Home', 'Camera', 'Profile'];
   const currentIndex = tabNames.indexOf(currentTabName);
@@ -331,52 +341,208 @@ const SwipeableScreen = ({ children, navigation, screenName }) => {
   );
 };
 
+// Animated Tab Navigator with smooth swipe transitions
+const AnimatedTabNavigator = () => {
+  const tabNames = ['Home', 'Camera', 'Profile'];
+  const screenWidth = SCREEN_WIDTH; // Make screen width accessible in component scope
+  const currentTabIndex = useSharedValue(0);
+  const translateX = useSharedValue(0);
+  const isDragging = useSharedValue(false);
+  const [activeTabIndex, setActiveTabIndex] = React.useState(0); // Track active tab for icons
+
+  // Navigation function that runs on JS thread
+  const navigateToTab = (targetIndex, instant = false) => {
+    console.log('📱 Navigating to tab index:', targetIndex, instant ? '(instant)' : '(animated)');
+    currentTabIndex.value = targetIndex;
+    setActiveTabIndex(targetIndex); // Update state for icon colors
+
+    if (instant) {
+      // Instant navigation for tab bar clicks
+      translateX.value = -targetIndex * screenWidth;
+    } else {
+      // Animated navigation for swipes
+      translateX.value = withSpring(-targetIndex * screenWidth, {
+        damping: 30,        // Increased from 20 for quicker settling
+        stiffness: 400,     // Increased from 90 for much snappier response
+        mass: 0.8,          // Reduced mass for faster animation
+      });
+    }
+  };
+
+  // Pan gesture for smooth swiping
+  const panGesture = Gesture.Pan()
+    .onStart(() => {
+      'worklet';
+      isDragging.value = true;
+    })
+    .onUpdate((event) => {
+      'worklet';
+      if (!isDragging.value) return;
+
+      // Calculate the new position based on current tab and drag
+      const baseOffset = -currentTabIndex.value * screenWidth;
+      let newTranslateX = baseOffset + event.translationX;
+
+      // Apply boundaries - don't let user drag beyond first/last tab
+      const minTranslateX = -(tabNames.length - 1) * screenWidth;
+      const maxTranslateX = 0;
+
+      newTranslateX = Math.max(minTranslateX, Math.min(maxTranslateX, newTranslateX));
+
+      translateX.value = newTranslateX;
+    })
+    .onEnd((event) => {
+      'worklet';
+      isDragging.value = false;
+
+      const { translationX, velocityX } = event;
+      const currentIndex = currentTabIndex.value;
+
+      // Calculate which tab we should snap to
+      let targetIndex = currentIndex;
+
+      // 50% threshold logic
+      const threshold = screenWidth * 0.5;
+      const fastSwipeThreshold = 500; // velocity threshold for quick swipes
+
+      if (Math.abs(velocityX) > fastSwipeThreshold) {
+        // Fast swipe - respect the direction
+        if (velocityX > 0 && currentIndex > 0) {
+          targetIndex = currentIndex - 1;
+        } else if (velocityX < 0 && currentIndex < tabNames.length - 1) {
+          targetIndex = currentIndex + 1;
+        }
+      } else {
+        // Slow swipe - use 50% threshold
+        if (translationX > threshold && currentIndex > 0) {
+          targetIndex = currentIndex - 1;
+        } else if (translationX < -threshold && currentIndex < tabNames.length - 1) {
+          targetIndex = currentIndex + 1;
+        }
+      }
+
+      console.log('Swipe ended:', {
+        translationX,
+        velocityX,
+        currentIndex,
+        targetIndex,
+        threshold: threshold
+      });
+
+      // Animate to target tab
+      runOnJS(navigateToTab)(targetIndex);
+    });
+
+  // Animated styles for the container
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateX: translateX.value }],
+    };
+  });
+
+  const renderTabContent = (tabName, index) => {
+    const screenProps = {
+      navigation: {
+        jumpTo: (targetTab) => {
+          const targetIndex = tabNames.indexOf(targetTab);
+          if (targetIndex !== -1) {
+            navigateToTab(targetIndex, false); // Keep animation for programmatic navigation
+          }
+        },
+        navigate: (targetTab) => {
+          const targetIndex = tabNames.indexOf(targetTab);
+          if (targetIndex !== -1) {
+            navigateToTab(targetIndex, false); // Keep animation for programmatic navigation
+          }
+        },
+      },
+      route: { name: tabName },
+    };
+
+    switch (tabName) {
+      case 'Home':
+        return <HomeScreen {...screenProps} />;
+      case 'Camera':
+        return <CameraScreen {...screenProps} />;
+      case 'Profile':
+        return <ProfileScreen {...screenProps} />;
+      default:
+        return <View />;
+    }
+  };
+
+  return (
+    <View style={{ flex: 1 }}>
+      <GestureDetector gesture={panGesture}>
+        <Animated.View style={[{ flex: 1, flexDirection: 'row', width: screenWidth * tabNames.length }, animatedStyle]}>
+          {tabNames.map((tabName, index) => (
+            <View key={tabName} style={{ width: screenWidth, flex: 1 }}>
+              {renderTabContent(tabName, index)}
+            </View>
+          ))}
+        </Animated.View>
+      </GestureDetector>
+
+      {/* Custom Tab Bar */}
+      <View style={styles.tabBarContainer}>
+        <LinearGradient
+          colors={['#FFFFFF', '#F8F9FF']}
+          style={styles.tabBarGradient}
+        >
+          <View style={styles.tabBar}>
+            {tabNames.map((tabName, index) => {
+              const iconName = tabName === 'Home' ? 'home' : tabName === 'Camera' ? 'camera' : 'user';
+              const isActive = activeTabIndex === index;
+
+              // Create animated styles for each tab to show active state
+              const tabAnimatedStyle = useAnimatedStyle(() => {
+                const isActiveAnimated = currentTabIndex.value === index;
+                return {
+                  opacity: isActiveAnimated ? 1 : 0.6,
+                  transform: [{ scale: isActiveAnimated ? 1.05 : 1 }],
+                };
+              });
+
+              const tabIndicatorVisibility = useAnimatedStyle(() => {
+                const isActiveAnimated = currentTabIndex.value === index;
+                return {
+                  opacity: isActiveAnimated ? 1 : 0,
+                  transform: [{ scaleY: isActiveAnimated ? 1 : 0 }],
+                };
+              });
+
+              return (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.tabButton}
+                  onPress={() => navigateToTab(index, true)} // Instant navigation for tab clicks
+                >
+                  <Animated.View style={[styles.tabButtonContent, tabAnimatedStyle]}>
+                    {/* Individual tab indicator */}
+                    <Animated.View style={[styles.tabIndicator, tabIndicatorVisibility]} />
+
+                    <FontAwesome5
+                      name={iconName}
+                      size={20}
+                      color={isActive ? '#35CAFC' : '#AAAAAA'}
+                    />
+                    <Text style={[styles.tabLabel, { color: isActive ? '#35CAFC' : '#AAAAAA' }]}>
+                      {tabName}
+                    </Text>
+                  </Animated.View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </LinearGradient>
+      </View>
+    </View>
+  );
+};
+
 // Main tab navigator with swipe-enabled screens
 const MainTabNavigator = () => (
-  <Tab.Navigator
-    tabBar={(props) => <CustomTabBar {...props} />}
-    screenOptions={{
-      headerShown: false,
-    }}
-    initialRouteName="Home"
-  >
-    <Tab.Screen
-      name="Home"
-      options={{
-        tabBarLabel: 'Home',
-      }}
-    >
-      {(props) => (
-        <SwipeableScreen navigation={props.navigation} screenName="Home">
-          <HomeScreen {...props} />
-        </SwipeableScreen>
-      )}
-    </Tab.Screen>
-    <Tab.Screen
-      name="Camera"
-      options={{
-        tabBarLabel: 'Capture',
-      }}
-    >
-      {(props) => (
-        <SwipeableScreen navigation={props.navigation} screenName="Camera">
-          <CameraScreen {...props} />
-        </SwipeableScreen>
-      )}
-    </Tab.Screen>
-    <Tab.Screen
-      name="Profile"
-      options={{
-        tabBarLabel: 'Profile',
-      }}
-    >
-      {(props) => (
-        <SwipeableScreen navigation={props.navigation} screenName="Profile">
-          <ProfileScreen {...props} />
-        </SwipeableScreen>
-      )}
-    </Tab.Screen>
-  </Tab.Navigator>
+  <AnimatedTabNavigator />
 );
 
 // Root navigator
