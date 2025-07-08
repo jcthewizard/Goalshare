@@ -8,6 +8,8 @@ import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import HomeScreen from '../screens/HomeScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import { GestureDetector, Gesture } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 
 import GoalDetailScreen from '../screens/GoalDetailScreen';
 import AddGoalScreen from '../screens/AddGoalScreen';
@@ -228,7 +230,108 @@ const styles = StyleSheet.create({
   },
 });
 
-// Main tab navigator updated with custom tab bar
+// Hook for swipe navigation between tabs
+const useSwipeNavigation = (navigation, currentTabName) => {
+  const tabNames = ['Home', 'Camera', 'Profile'];
+  const currentIndex = tabNames.indexOf(currentTabName);
+
+  // Create a function that runs on JS thread for navigation
+  const navigateToTab = (targetTab) => {
+    console.log('📱 Running navigation on JS thread:', targetTab);
+    try {
+      if (navigation && typeof navigation.jumpTo === 'function') {
+        console.log('✅ Using jumpTo:', targetTab);
+        navigation.jumpTo(targetTab);
+      } else if (navigation && typeof navigation.navigate === 'function') {
+        console.log('✅ Using navigate:', targetTab);
+        navigation.navigate(targetTab);
+      } else {
+        console.warn('⚠️ No valid navigation method found');
+      }
+    } catch (error) {
+      console.error('❌ JS thread navigation error:', error);
+    }
+  };
+
+  const swipeGesture = Gesture.Pan()
+    .minDistance(30) // Require minimum distance to start
+    .failOffsetY([-50, 50]) // Fail if too much vertical movement
+    .activeOffsetX([-20, 20]) // Activate on horizontal movement
+    .simultaneousWithExternalGesture() // Allow with other gestures
+    .onEnd((event) => {
+      'worklet';
+      try {
+        // Simple and reliable swipe detection
+        const { velocityX, translationX } = event;
+        const minSwipeDistance = 80;
+        const minSwipeVelocity = 500;
+
+        // Check for valid swipe
+        const isValidSwipe = Math.abs(translationX) > minSwipeDistance || Math.abs(velocityX) > minSwipeVelocity;
+
+        console.log('Swipe detected:', {
+          currentTabName,
+          currentIndex,
+          translationX,
+          velocityX,
+          isValidSwipe,
+          hasNavigation: !!navigation,
+          hasNavigateMethod: !!navigation?.navigate,
+          hasJumpToMethod: !!navigation?.jumpTo,
+          navigationMethods: navigation ? Object.keys(navigation) : []
+        });
+
+        if (isValidSwipe && navigation) {
+          let targetTab = null;
+
+          if (translationX > 0 || velocityX > 0) {
+            // Swipe right - go to previous tab
+            if (currentIndex > 0) {
+              targetTab = tabNames[currentIndex - 1];
+              console.log('🔄 Attempting to navigate to previous tab:', targetTab);
+            }
+          } else {
+            // Swipe left - go to next tab
+            if (currentIndex < tabNames.length - 1) {
+              targetTab = tabNames[currentIndex + 1];
+              console.log('🔄 Attempting to navigate to next tab:', targetTab);
+            }
+          }
+
+          if (targetTab) {
+            console.log('🎯 Navigation worklet called for:', targetTab);
+            // Use runOnJS to call the navigation function on JS thread
+            runOnJS(navigateToTab)(targetTab);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Swipe navigation error:', error);
+      }
+    });
+
+  return swipeGesture;
+};
+
+// Swipe-enabled screen wrapper
+const SwipeableScreen = ({ children, navigation, screenName }) => {
+  // Safety check to ensure navigation exists
+  if (!navigation || !screenName) {
+    console.warn('SwipeableScreen: Missing navigation or screenName', { navigation: !!navigation, screenName });
+    return <View style={{ flex: 1 }}>{children}</View>;
+  }
+
+  const swipeGesture = useSwipeNavigation(navigation, screenName);
+
+  return (
+    <GestureDetector gesture={swipeGesture}>
+      <View style={{ flex: 1 }}>
+        {children}
+      </View>
+    </GestureDetector>
+  );
+};
+
+// Main tab navigator with swipe-enabled screens
 const MainTabNavigator = () => (
   <Tab.Navigator
     tabBar={(props) => <CustomTabBar {...props} />}
@@ -239,25 +342,40 @@ const MainTabNavigator = () => (
   >
     <Tab.Screen
       name="Home"
-      component={HomeScreen}
       options={{
         tabBarLabel: 'Home',
       }}
-    />
+    >
+      {(props) => (
+        <SwipeableScreen navigation={props.navigation} screenName="Home">
+          <HomeScreen {...props} />
+        </SwipeableScreen>
+      )}
+    </Tab.Screen>
     <Tab.Screen
       name="Camera"
-      component={CameraScreen}
       options={{
         tabBarLabel: 'Capture',
       }}
-    />
+    >
+      {(props) => (
+        <SwipeableScreen navigation={props.navigation} screenName="Camera">
+          <CameraScreen {...props} />
+        </SwipeableScreen>
+      )}
+    </Tab.Screen>
     <Tab.Screen
       name="Profile"
-      component={ProfileScreen}
       options={{
         tabBarLabel: 'Profile',
       }}
-    />
+    >
+      {(props) => (
+        <SwipeableScreen navigation={props.navigation} screenName="Profile">
+          <ProfileScreen {...props} />
+        </SwipeableScreen>
+      )}
+    </Tab.Screen>
   </Tab.Navigator>
 );
 
@@ -290,7 +408,7 @@ const Navigation = () => {
                 presentation: 'transparentModal',
                 cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
                 gestureEnabled: false, // Disable default gesture since we're using custom
-                cardStyle: { 
+                cardStyle: {
                   backgroundColor: 'transparent',
                 },
                 cardOverlayEnabled: true,
