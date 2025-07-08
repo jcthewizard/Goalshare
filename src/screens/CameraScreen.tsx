@@ -41,6 +41,7 @@ export default function CameraScreen({ navigation }: Props) {
   const [showGoalPicker, setShowGoalPicker] = useState(false);
   const [isMilestone, setIsMilestone] = useState(false);  // Add this state for significant milestone toggle
   const [isSwitchingCamera, setIsSwitchingCamera] = useState(false); // Add state to track camera switching
+  const isCancelledRef = useRef(false); // Use ref instead of state for reliable async checking
   const { goalState, addTimelineItem } = useGoals();
   const cameraRef = useRef<any>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -93,6 +94,9 @@ export default function CameraScreen({ navigation }: Props) {
 
   const takePicture = async () => {
     if (cameraRef.current && !isCameraFrozen) {
+      // Reset cancellation state
+      isCancelledRef.current = false;
+
       // Immediately pause the camera preview for instant feedback
       try {
         await cameraRef.current.pausePreview();
@@ -111,6 +115,13 @@ export default function CameraScreen({ navigation }: Props) {
           exif: false,
           skipProcessing: facing === 'front', // Prevent flipping for front camera
         });
+
+        // Check if user cancelled during photo capture
+        if (isCancelledRef.current) {
+          // User clicked X, don't show the photo and return to camera mode
+          console.log('Photo capture was cancelled by user');
+          return;
+        }
 
         if (photo && photo.uri) {
           setCapturedImage(photo.uri);
@@ -209,6 +220,7 @@ export default function CameraScreen({ navigation }: Props) {
   };
 
   const resetCapture = () => {
+    isCancelledRef.current = true; // Mark as cancelled to prevent showing any photo currently being captured
     setCapturedImage(null);
     setIsCameraFrozen(false);
     setCaption('');
