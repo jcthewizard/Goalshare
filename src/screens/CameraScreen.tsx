@@ -40,6 +40,8 @@ export default function CameraScreen({ navigation }: Props) {
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [showGoalPicker, setShowGoalPicker] = useState(false);
   const [isMilestone, setIsMilestone] = useState(false);  // Add this state for significant milestone toggle
+  const [isSwitchingCamera, setIsSwitchingCamera] = useState(false); // Add state to track camera switching
+  const isCancelledRef = useRef(false); // Use ref instead of state for reliable async checking
   const { goalState, addTimelineItem } = useGoals();
   const cameraRef = useRef<any>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -53,9 +55,20 @@ export default function CameraScreen({ navigation }: Props) {
 
   const doubleTap = Gesture.Tap()
     .numberOfTaps(2)
+    .maxDistance(10)
+    .runOnJS(true)
     .onEnd(() => {
-      if (!isCameraFrozen) {
-        setFacing(current => (current === 'back' ? 'front' : 'back'));
+      try {
+        if (!isCameraFrozen && cameraRef.current && !isSwitchingCamera) {
+          setIsSwitchingCamera(true);
+          setFacing(current => (current === 'back' ? 'front' : 'back'));
+          setTimeout(() => {
+            setIsSwitchingCamera(false);
+          }, 500);
+        }
+      } catch (error) {
+        console.log('Double tap error:', error);
+        setIsSwitchingCamera(false);
       }
     });
 
@@ -81,6 +94,9 @@ export default function CameraScreen({ navigation }: Props) {
 
   const takePicture = async () => {
     if (cameraRef.current && !isCameraFrozen) {
+      // Reset cancellation state
+      isCancelledRef.current = false;
+
       // Immediately pause the camera preview for instant feedback
       try {
         await cameraRef.current.pausePreview();
@@ -88,17 +104,25 @@ export default function CameraScreen({ navigation }: Props) {
         // If pausePreview fails, continue anyway
         console.log('Could not pause preview:', e);
       }
-      
+
       // Freeze the UI immediately
       setIsCameraFrozen(true);
-      
+
       try {
         const photo = await cameraRef.current.takePictureAsync({
           quality: 0.8,
           base64: false,
-          exif: false
+          exif: false,
+          skipProcessing: facing === 'front', // Prevent flipping for front camera
         });
-        
+
+        // Check if user cancelled during photo capture
+        if (isCancelledRef.current) {
+          // User clicked X, don't show the photo and return to camera mode
+          console.log('Photo capture was cancelled by user');
+          return;
+        }
+
         if (photo && photo.uri) {
           setCapturedImage(photo.uri);
         } else {
@@ -162,7 +186,7 @@ export default function CameraScreen({ navigation }: Props) {
         imageUri: capturedImage,
         isMilestone: isMilestone  // Use the toggle state
       });
-      
+
       resetCapture();
       navigation.navigate('Home');
       Alert.alert('Success', 'Added to your timeline!');
@@ -196,13 +220,14 @@ export default function CameraScreen({ navigation }: Props) {
   };
 
   const resetCapture = () => {
+    isCancelledRef.current = true; // Mark as cancelled to prevent showing any photo currently being captured
     setCapturedImage(null);
     setIsCameraFrozen(false);
     setCaption('');
     setSelectedGoalId(null);
     setShowCaption(false);
     fadeAnim.setValue(0);
-    
+
     // Resume camera preview
     if (cameraRef.current) {
       try {
@@ -278,14 +303,15 @@ export default function CameraScreen({ navigation }: Props) {
   );
 
   return (
-    <GestureDetector gesture={doubleTap}>
-      <SafeAreaView style={styles.container}>
-        <CameraView
-          style={styles.camera}
-          facing={facing}
-          ref={cameraRef}
-          animateShutter={false}
-        />
+    <SafeAreaView style={styles.container}>
+      <CameraView
+        style={styles.camera}
+        facing={facing}
+        ref={cameraRef}
+        animateShutter={false}
+        mirror={facing === 'front'}
+      />
+      <GestureDetector gesture={doubleTap}>
         <View style={styles.cameraContainer}>
           {/* Captured image overlay - only show when we have the actual image */}
           {capturedImage && (
@@ -423,9 +449,9 @@ export default function CameraScreen({ navigation }: Props) {
             </>
           )}
         </View>
-        {renderGoalPicker()}
-      </SafeAreaView>
-    </GestureDetector>
+      </GestureDetector>
+      {renderGoalPicker()}
+    </SafeAreaView>
   );
 }
 
@@ -729,4 +755,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginRight: 6,
   },
-});'' 
+});
