@@ -1,6 +1,6 @@
 /* eslint-disable */
 // @ts-nocheck
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -9,7 +9,11 @@ import {
   ScrollView,
   TouchableOpacity,
   Text,
-  Image
+  Image,
+  Modal,
+  Dimensions,
+  Platform,
+  StatusBar
 } from 'react-native';
 import {
   Avatar,
@@ -19,31 +23,38 @@ import {
   Divider,
   useTheme,
   Tabs,
-  Tab
+  Tab,
+  Paragraph,
+  Surface,
+  IconButton,
+  TextInput,
+  FAB
 } from 'react-native-paper';
-import { useAuth } from '../contexts/AuthContext';
-import { useGoals } from '../contexts/GoalContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome5 } from '@expo/vector-icons';
+import { StackScreenProps } from '@react-navigation/stack';
+import { MainTabParamList } from '../navigation';
+import { useAuth } from '../contexts/FirebaseAuthContext';
+import { useGoals } from '../contexts/FirebaseGoalContext';
 
 
 const ProfileScreen = () => {
   const { user, logout } = useAuth();
-  const { goalState } = useGoals();
+  const { goals } = useGoals();
   const theme = useTheme();
 
   // Calculate stats
-  const totalGoals = goalState.goals.length;
-  const completedGoals = goalState.goals.filter(goal => goal.isCompleted).length;
-  const totalMilestones = goalState.goals.reduce(
-    (sum, goal) => sum + goal.milestones.length + (goal.timeline?.length || 0),
+  const totalGoals = goals?.length || 0;
+  const completedGoals = goals?.filter(goal => goal.isCompleted).length || 0;
+  const totalMilestones = goals?.reduce(
+    (sum, goal) => sum + (goal.milestones?.length || 0) + (goal.timeline?.length || 0),
     0
-  );
+  ) || 0;
   // Timeline items represent completed items
-  const completedMilestones = goalState.goals.reduce(
+  const completedMilestones = goals?.reduce(
     (sum, goal) => sum + (goal.timeline?.length || 0),
     0
-  );
+  ) || 0;
 
   const goalCompletionRate = totalGoals > 0
     ? Math.round((completedGoals / totalGoals) * 100)
@@ -102,7 +113,7 @@ const ProfileScreen = () => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >

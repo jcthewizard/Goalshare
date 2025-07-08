@@ -23,7 +23,7 @@ import {
 } from 'react-native';
 import { Card, IconButton, Avatar, Divider, useTheme } from 'react-native-paper';
 import { useSocial } from '../contexts/SocialContext';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/FirebaseAuthContext';
 import { MaterialCommunityIcons, FontAwesome } from '@expo/vector-icons';
 import { formatDistanceToNow } from 'date-fns';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -46,7 +46,7 @@ const FeedScreen = () => {
 
   // Add this new animated value to track keyboard position
   const inputPositionY = useRef(new Animated.Value(0)).current;
-  
+
   // Improve the keyboard animation synchronization
   useEffect(() => {
     // Better handling for keyboard events
@@ -54,7 +54,7 @@ const FeedScreen = () => {
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
       (event) => {
         const keyboardHeight = event.endCoordinates.height;
-        
+
         // Use different animation configurations for iOS and Android
         if (Platform.OS === 'ios') {
           // iOS: Use the keyboard's native animation timing
@@ -76,7 +76,7 @@ const FeedScreen = () => {
         }
       }
     );
-    
+
     const keyboardWillHideListener = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
       (event) => {
@@ -98,7 +98,7 @@ const FeedScreen = () => {
         }
       }
     );
-    
+
     return () => {
       keyboardWillShowListener.remove();
       keyboardWillHideListener.remove();
@@ -115,7 +115,7 @@ const FeedScreen = () => {
       if (!initializedItemsRef.has(item.id)) {
         hasNewItems = true;
         initializedItemsRef.add(item.id);
-        
+
         newAnimations[item.id] = {
           opacity: new Animated.Value(0),
           translateY: new Animated.Value(50),
@@ -188,9 +188,9 @@ const FeedScreen = () => {
     const isOwnPost = user && item.userId === user.uid;
 
     // Use existing animations or create default values for items that don't have animations
-    const animations = itemAnimations[item.id] || { 
-      opacity: new Animated.Value(1), 
-      translateY: new Animated.Value(0) 
+    const animations = itemAnimations[item.id] || {
+      opacity: new Animated.Value(1),
+      translateY: new Animated.Value(0)
     };
 
     return (
@@ -209,11 +209,11 @@ const FeedScreen = () => {
               <Avatar.Image
                 size={40}
                 source={{
-                  uri: item.userId === 'user1' 
+                  uri: item.userId === 'user1'
                     ? 'https://randomuser.me/api/portraits/men/1.jpg'
                     : item.userId === 'user2'
                     ? 'https://randomuser.me/api/portraits/women/2.jpg'
-                    : user && isOwnPost 
+                    : user && isOwnPost
                     ? (user.photoURL || 'https://randomuser.me/api/portraits/men/32.jpg')
                     : 'https://randomuser.me/api/portraits/men/3.jpg'
                 }}
@@ -223,7 +223,9 @@ const FeedScreen = () => {
                   {isOwnPost ? 'You' : item.displayName}
                 </Text>
                 <Text style={styles.timestamp}>
-                  {formatDistanceToNow(new Date(item.timestamp))} ago
+                  {item.timestamp && !isNaN(new Date(item.timestamp).getTime())
+                    ? formatDistanceToNow(new Date(item.timestamp)) + ' ago'
+                    : 'Recently'}
                 </Text>
               </View>
             </View>
@@ -243,10 +245,10 @@ const FeedScreen = () => {
                 colors={isOwnPost ? ['#4CAF50', '#81C784'] : ['#2196F3', '#64B5F6']}
                 style={styles.milestoneBadge}
               >
-                <MaterialCommunityIcons 
-                  name="flag-checkered" 
-                  size={16} 
-                  color="white" 
+                <MaterialCommunityIcons
+                  name="flag-checkered"
+                  size={16}
+                  color="white"
                   style={styles.milestoneIcon}
                 />
                 <Text style={styles.milestoneTitle}>{item.milestoneTitle}</Text>
@@ -326,7 +328,9 @@ const FeedScreen = () => {
                   </Text>
                   <Text style={styles.commentText}>{comment.text}</Text>
                   <Text style={styles.commentTimestamp}>
-                    {formatDistanceToNow(new Date(comment.timestamp))} ago
+                    {comment.timestamp && !isNaN(new Date(comment.timestamp).getTime())
+                      ? formatDistanceToNow(new Date(comment.timestamp)) + ' ago'
+                      : 'Recently'}
                   </Text>
                 </View>
               ))}
@@ -372,7 +376,7 @@ const FeedScreen = () => {
                 onPress={() => setCommentModalVisible(false)}
               />
             </View>
-            
+
             <View style={styles.modalHandle} />
 
             <FlatList
@@ -383,7 +387,9 @@ const FeedScreen = () => {
                   <View style={styles.modalCommentHeader}>
                     <Text style={styles.modalCommentUsername}>{item.displayName}</Text>
                     <Text style={styles.modalCommentTimestamp}>
-                      {formatDistanceToNow(new Date(item.timestamp))} ago
+                      {item.timestamp && !isNaN(new Date(item.timestamp).getTime())
+                        ? formatDistanceToNow(new Date(item.timestamp)) + ' ago'
+                        : 'Recently'}
                     </Text>
                   </View>
                   <Text style={styles.modalCommentText}>{item.text}</Text>
@@ -401,10 +407,10 @@ const FeedScreen = () => {
             />
 
             {/* Wrap input in Animated.View to move with keyboard */}
-            <Animated.View 
+            <Animated.View
               style={[
                 styles.inputWrapper,
-                { 
+                {
                   transform: [{ translateY: inputPositionY }],
                   // Add hardware acceleration hint
                   backfaceVisibility: 'hidden'

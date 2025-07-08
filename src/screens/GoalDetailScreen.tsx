@@ -14,10 +14,10 @@ import {
   Alert
 } from 'react-native';
 import { Card, Title, Paragraph, Checkbox, useTheme, IconButton } from 'react-native-paper';
-import { useGoals } from '../contexts/GoalContext';
+import { useGoals } from '../contexts/FirebaseGoalContext';
 import { ThemeColors } from '../types';
 
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/FirebaseAuthContext';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation';
 import { format } from 'date-fns';
@@ -34,9 +34,9 @@ type Props = StackScreenProps<RootStackParamList, 'GoalDetail'>;
 
 const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.ReactElement => {
   const { goalId } = route.params;
-  const { goalState, getGoals, deleteGoal, deleteMilestone, deleteTimelineItem, updateGoal, addTimelineItem } = useGoals();
+  const { goals, getGoals, deleteGoal, deleteMilestone, deleteTimelineItem, updateGoal, addTimelineItem } = useGoals();
   const { user } = useAuth();
-  const [goal, setGoal] = useState(goalState.goals.find((g) => g.id === goalId) || null);
+  const [goal, setGoal] = useState(goals.find((g) => g.id === goalId) || null);
   const [animatedValues, setAnimatedValues] = useState<{[key: string]: Animated.Value}>({});
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [themeColors, setThemeColors] = useState<ThemeColors>({
@@ -102,16 +102,16 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
 
   // Use this effect only once to fetch goals if needed
   useEffect(() => {
-    if (goalState.goals.length === 0) {
+    if (goals.length === 0) {
       getGoals();
     }
   }, []); // Empty dependency array so it only runs once
 
   // Update goal when goalState changes
   useEffect(() => {
-    const updatedGoal = goalState.goals.find((g) => g.id === goalId) || null;
+    const updatedGoal = goals.find((g) => g.id === goalId) || null;
     setGoal(updatedGoal);
-  }, [goalState.goals, goalId]);
+  }, [goals, goalId]);
 
   // Initialize animated values for milestones
   useEffect(() => {
@@ -229,11 +229,11 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
 
   const handleCompleteMilestone = async (milestoneId: string): void => {
     if (!goal) return;
-    
+
     // Find the milestone
     const milestone = goal.milestones.find(m => m.id === milestoneId);
     if (!milestone) return;
-    
+
     try {
       // Add to timeline
       await addTimelineItem(goal.id, {
@@ -242,10 +242,10 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
         imageUri: milestone.imageUri,
         isMilestone: milestone.isMilestone
       });
-      
+
       // Remove from milestones
       await deleteMilestone(goal.id, milestoneId);
-      
+
       // Refresh the goal
       await getGoals();
     } catch (error) {
@@ -253,7 +253,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
     }
   };
 
-  
+
 
   // Toggle color picker
   const toggleColorPicker = () => {
@@ -270,18 +270,18 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
   // Change theme colors
   const changeThemeColors = async (primary: string, secondary: string, accent: string) => {
     console.log('🎨 Changing theme colors:', { primary, secondary, accent });
-    
+
     const newThemeColors = {
       primary,
       secondary,
       accent
     };
-    
+
     // Update state immediately for instant UI feedback
     setThemeColors(newThemeColors);
     console.log('🎨 Theme colors updated in state:', newThemeColors);
     toggleColorPicker();
-    
+
     // For now, just keep it in local state until database issues are resolved
     // TODO: Re-enable database saving once backend is stable
     /*
@@ -375,7 +375,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
       if (isScreenSliding) {
         return;
       }
-      
+
       // During active gesture, directly follow finger position
       const dragX = e.translationX;
 
@@ -392,7 +392,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
       if (isScreenSliding) {
         return;
       }
-      
+
       // When gesture ends, decide whether to snap to next page or return to current
       const dragX = e.translationX;
       const dragVelocity = e.velocityX;
@@ -445,7 +445,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
         x: e.x,
         shouldAllow: e.x <= 50 // Only allow if starting within 50 pixels of left edge (removed y restriction)
       };
-      
+
       // Set screen sliding state if gesture is allowed
       if (gestureStartPosition.current.shouldAllow) {
         setIsScreenSliding(true);
@@ -457,7 +457,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
         // Update screen position in real-time, with some resistance
         const translateX = Math.min(e.translationX * 1, SCREEN_WIDTH);
         screenTranslateX.setValue(translateX);
-        
+
         // Add subtle opacity effect based on drag progress
         const progress = Math.min(translateX / (SCREEN_WIDTH * 0.6), 1);
         fadeAnim.setValue(1 - progress * 0.2);
@@ -471,7 +471,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
 
       const dragX = e.translationX;
       const dragVelocity = e.velocityX;
-      
+
       // Threshold for dismissing the screen (40% of screen width or fast velocity)
       const dismissThreshold = SCREEN_WIDTH * 0.4;
       const shouldDismiss = (dragX > dismissThreshold) || (dragVelocity > 800);
@@ -514,7 +514,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
           setIsScreenSliding(false);
         });
       }
-      
+
       // Reset screen sliding state when gesture ends (for cases where animation doesn't run)
       if (!gestureStartPosition.current.shouldAllow) {
         setIsScreenSliding(false);
@@ -573,7 +573,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
 
   return (
     <Animated.View style={[
-      styles.container, 
+      styles.container,
       { backgroundColor: 'transparent' }, // Fully transparent to show HomeScreen behind
       { transform: [{ translateX: screenTranslateX }] }
     ]}>
@@ -678,7 +678,9 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                   <View style={styles.dateContainer}>
                     <FontAwesome5 name="calendar-alt" size={14} color="#FFF" style={{ marginRight: 6 }} />
                     <Text style={styles.goalInfoText}>
-                      {goal.targetDate ? format(new Date(goal.targetDate), 'MMM d, yyyy') : 'No target date'}
+                      {goal.targetDate && !isNaN(new Date(goal.targetDate).getTime())
+                        ? format(new Date(goal.targetDate), 'MMM d, yyyy')
+                        : 'No target date'}
                     </Text>
                   </View>
                 </View>
@@ -704,8 +706,8 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
               }]}>
                 {/* Timeline Page (now first) */}
                 <View style={[styles.page, { width: SCREEN_WIDTH }]}>
-                  <ScrollView 
-                    contentContainerStyle={styles.scrollContent} 
+                  <ScrollView
+                    contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={true}
                     bounces={true}
                     alwaysBounceVertical={false}
@@ -775,7 +777,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                                         >
                                           <Ionicons name="ellipsis-horizontal" size={20} color="#666" />
                                         </TouchableOpacity>
-                                        
+
                                         {activeDropdown === milestone.id && (
                                           <Animated.View style={[
                                             styles.dropdownMenu,
@@ -798,7 +800,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                                             }
                                           ]}>
                                             {/* Remove the edit milestone option */}
-                                            
+
                                             <TouchableOpacity
                                               style={styles.dropdownOption}
                                               onPress={() => {
@@ -834,7 +836,9 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
 
                                   {/* Completion date could be added here */}
                                   <Text style={styles.completedDate}>
-                                    Added {format(new Date(milestone.createdAt || new Date()), 'MMM d, yyyy')}
+                                    Added {milestone.createdAt && !isNaN(new Date(milestone.createdAt).getTime())
+                                      ? format(new Date(milestone.createdAt), 'MMM d, yyyy')
+                                      : 'Recently'}
                                   </Text>
                                 </Card.Content>
                               </Card>
@@ -866,7 +870,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                   ) : (
                     <View style={styles.simpleStepsContainer}>
                       {stepsToComplete.map((step, index) => (
-                        <Animated.View 
+                        <Animated.View
                           key={step.id}
                           style={{
                             opacity: stepAnimations[step.id] || 1,
@@ -931,7 +935,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                           </TouchableOpacity>
                         </Animated.View>
                       ))}
-                      
+
                       {/* Add Step Button */}
                       <TouchableOpacity
                         style={styles.addStepButton}
@@ -950,13 +954,13 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
             {/* Page indicator dots */}
             <View style={styles.pageDotsContainer}>
               <View style={[
-                styles.pageDot, 
-                currentPage === 0 ? styles.activePageDot : null, 
+                styles.pageDot,
+                currentPage === 0 ? styles.activePageDot : null,
                 { backgroundColor: currentPage === 0 ? themeColors.primary : '#e0e0e0' }
               ]} />
               <View style={[
-                styles.pageDot, 
-                currentPage === 1 ? styles.activePageDot : null, 
+                styles.pageDot,
+                currentPage === 1 ? styles.activePageDot : null,
                 { backgroundColor: currentPage === 1 ? themeColors.primary : '#e0e0e0' }
               ]} />
             </View>

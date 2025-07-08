@@ -2,8 +2,8 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, SafeAreaView, TouchableOpacity, Animated, Easing, Platform, StatusBar, Alert, TouchableWithoutFeedback } from 'react-native';
 import { FAB, Card, Title, Paragraph, useTheme, Avatar, IconButton, Surface } from 'react-native-paper';
-import { useGoals } from '../contexts/GoalContext';
-import { useAuth } from '../contexts/AuthContext';
+import { useGoals } from '../contexts/FirebaseGoalContext';
+import { useAuth } from '../contexts/FirebaseAuthContext';
 import { StackScreenProps } from '@react-navigation/stack';
 import { MainTabParamList, RootStackParamList } from '../navigation';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -463,9 +463,7 @@ const getLatestActivityDate = (goal: Goal): Date => {
 
 // Define HomeScreen as a separate function to fix return type error
 function HomeScreen({ navigation }: Props): React.ReactElement {
-  const goalContext = useGoals();
-  const { deleteGoal, updateGoal } = useGoals();
-  const goals = goalContext.goalState ? goalContext.goalState.goals : [];
+  const { goals, getGoals, deleteGoal, updateGoal } = useGoals(); // Use Firebase context directly
   const { user } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
@@ -474,6 +472,7 @@ function HomeScreen({ navigation }: Props): React.ReactElement {
   const fabAnim = useRef(new Animated.Value(1)).current;
   const dropdownAnim = useRef(new Animated.Value(0)).current;
   const completedDropdownAnim = useRef(new Animated.Value(0)).current;
+  const completedSectionAnim = useRef(new Animated.Value(0)).current;
   const theme = useTheme();
 
   // Filter goals into active and completed - sort unpinned by latest activity
@@ -518,16 +517,16 @@ function HomeScreen({ navigation }: Props): React.ReactElement {
       ]).start();
 
       // Call getGoals from context if it exists
-      if (goalContext.getGoals) {
-        goalContext.getGoals();
+      if (getGoals) {
+        getGoals();
       }
     }, [])
   );
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    if (goalContext.getGoals) {
-      await goalContext.getGoals();
+    if (getGoals) {
+      await getGoals();
     }
     setRefreshing(false);
   };
@@ -587,8 +586,8 @@ function HomeScreen({ navigation }: Props): React.ReactElement {
                 completedDate: new Date()
               });
               // Refresh goals to update UI
-              if (goalContext.getGoals) {
-                await goalContext.getGoals();
+              if (getGoals) {
+                await getGoals();
               }
             } catch (error) {
               Alert.alert("Error", "Failed to complete goal. Please try again.");
@@ -716,7 +715,9 @@ function HomeScreen({ navigation }: Props): React.ReactElement {
               <View style={styles.goalInfo}>
                 <FontAwesome5 name="calendar-alt" size={14} color="#FFF" />
                 <Text style={styles.goalInfoText}>
-                  {item.targetDate ? new Date(item.targetDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'No date'}
+                  {item.targetDate && !isNaN(new Date(item.targetDate).getTime())
+                    ? new Date(item.targetDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                    : 'No date'}
                 </Text>
               </View>
 
@@ -769,7 +770,9 @@ function HomeScreen({ navigation }: Props): React.ReactElement {
               <View style={styles.goalInfo}>
                 <FontAwesome5 name="calendar-check" size={14} color="#666" />
                 <Text style={[styles.goalInfoText, styles.completedGoalInfoText]}>
-                  Completed {item.completedDate ? new Date(item.completedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
+                  Completed {item.completedDate && !isNaN(new Date(item.completedDate).getTime())
+                    ? new Date(item.completedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                    : ''}
                 </Text>
               </View>
 
@@ -810,10 +813,18 @@ function HomeScreen({ navigation }: Props): React.ReactElement {
   // Completed goals section component
   const CompletedGoalsSection = () => {
     React.useEffect(() => {
+      // Animate chevron rotation with native driver
       Animated.timing(completedDropdownAnim, {
         toValue: showCompletedGoals ? 1 : 0,
         duration: 300,
         useNativeDriver: true,
+      }).start();
+
+      // Animate height without native driver
+      Animated.timing(completedSectionAnim, {
+        toValue: showCompletedGoals ? 1 : 0,
+        duration: 300,
+        useNativeDriver: false,
       }).start();
     }, [showCompletedGoals]);
 
@@ -844,11 +855,11 @@ function HomeScreen({ navigation }: Props): React.ReactElement {
           style={[
             styles.completedGoalsContainer,
             {
-              maxHeight: completedDropdownAnim.interpolate({
+              maxHeight: completedSectionAnim.interpolate({
                 inputRange: [0, 1],
                 outputRange: [0, 1000]
               }),
-              opacity: completedDropdownAnim
+              opacity: completedSectionAnim
             }
           ]}
         >

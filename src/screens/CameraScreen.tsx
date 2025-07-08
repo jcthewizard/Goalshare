@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -14,17 +14,28 @@ import {
   Image,
   Platform,
   TouchableWithoutFeedback,
-  Keyboard
+  Keyboard,
+  StatusBar
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import { FontAwesome5, Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { useGoals } from '../contexts/GoalContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MainTabParamList } from '../navigation';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
+import ReanimatedAnimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  runOnJS,
+  interpolate
+} from 'react-native-reanimated';
+import { Picker } from '@react-native-picker/picker';
+import { Switch } from 'react-native-paper';
+import { useGoals } from '../contexts/FirebaseGoalContext';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -42,7 +53,7 @@ export default function CameraScreen({ navigation }: Props) {
   const [isMilestone, setIsMilestone] = useState(false);  // Add this state for significant milestone toggle
   const [isSwitchingCamera, setIsSwitchingCamera] = useState(false); // Add state to track camera switching
   const isCancelledRef = useRef(false); // Use ref instead of state for reliable async checking
-  const { goalState, addTimelineItem } = useGoals();
+  const { goals, addTimelineItem } = useGoals();
   const cameraRef = useRef<any>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const captionInputRef = useRef<TextInput>(null);
@@ -129,7 +140,7 @@ export default function CameraScreen({ navigation }: Props) {
           // Reset if photo capture failed
           setIsCameraFrozen(false);
           await cameraRef.current.resumePreview();
-          Alert.alert('Error', 'Failed to capture photo');
+          console.log('Failed to capture photo - no photo data returned');
         }
       } catch (error) {
         console.error('Camera error:', error);
@@ -141,7 +152,7 @@ export default function CameraScreen({ navigation }: Props) {
         } catch (e) {
           console.log('Could not resume preview:', e);
         }
-        Alert.alert('Error', 'Failed to take picture');
+        console.log('Failed to take picture:', error.message);
       }
     }
   };
@@ -189,9 +200,8 @@ export default function CameraScreen({ navigation }: Props) {
 
       resetCapture();
       navigation.jumpTo('Home');
-      Alert.alert('Success', 'Added to your timeline!');
     } catch (error) {
-      Alert.alert('Error', 'Failed to add to timeline');
+      console.error('Failed to add to timeline:', error);
     }
   };
 
@@ -272,7 +282,7 @@ export default function CameraScreen({ navigation }: Props) {
               { transform: [{ translateY: goalPickerAnim }] }
             ]}>
               <Text style={styles.goalPickerTitle}>Select Goal</Text>
-              {goalState.goals.map((goal) => (
+              {goals.map((goal) => (
                 <TouchableOpacity
                   key={goal.id}
                   style={[
@@ -429,7 +439,7 @@ export default function CameraScreen({ navigation }: Props) {
                 >
                   <Text style={styles.goalSelectorCompactText}>
                     {selectedGoalId
-                      ? goalState.goals.find(g => g.id === selectedGoalId)?.title.substring(0, 15) + '...'
+                      ? goals.find(g => g.id === selectedGoalId)?.title.substring(0, 15) + '...'
                       : 'Goal'}
                   </Text>
                   <Ionicons name="chevron-up" size={14} color="white" />

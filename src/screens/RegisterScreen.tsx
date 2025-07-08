@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, StatusBar, Alert } from 'react-native';
 import { TextInput, Button, Title, Surface } from 'react-native-paper';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/FirebaseAuthContext';
 import { StackScreenProps } from '@react-navigation/stack';
 import { AuthStackParamList } from '../navigation';
 
@@ -29,8 +29,8 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     setLoading(true);
 
     try {
-      // Register the user with email and password
-      await register(email, password);
+      // Register the user with email, password, and name
+      await register(email, password, name);
     } catch (error) {
       Alert.alert('Registration Failed', error instanceof Error ? error.message : 'An error occurred');
     } finally {

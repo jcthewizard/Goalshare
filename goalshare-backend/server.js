@@ -15,7 +15,29 @@ connectDB();
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:19006', 'http://localhost:8081', 'http://192.168.181.206:19006'],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+
+    // In development, allow any origin
+    if (process.env.NODE_ENV === 'development') {
+      return callback(null, true);
+    }
+
+    // In production, you can add specific allowed origins
+    const allowedOrigins = [
+      'http://localhost:19006',
+      'http://localhost:8081',
+      'exp://192.168.181.206:19000', // Expo development
+      // Add your production domains here when deploying
+    ];
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -71,7 +93,7 @@ app.use('*', (req, res) => {
 // Global error handler
 app.use((error, req, res, next) => {
   console.error('Global error handler:', error);
-  
+
   // Handle specific error types
   if (error.name === 'ValidationError') {
     return res.status(400).json({
@@ -118,10 +140,11 @@ process.on('SIGINT', () => {
   });
 });
 
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📱 Health check: http://localhost:${PORT}/api/health`);
   console.log(`🎯 Goals API: http://localhost:${PORT}/api/goals`);
   console.log(`🔐 Auth API: http://localhost:${PORT}/api/auth`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🌐 Accessible from any device on network at: http://192.168.181.206:${PORT}`);
 });

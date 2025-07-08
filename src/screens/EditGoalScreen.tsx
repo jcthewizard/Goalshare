@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Alert, ScrollView, SafeAreaView, Platform, StatusBar, TouchableOpacity, ActivityIndicator, Animated } from 'react-native';
 import { TextInput, Button, Title, Switch, Text, Surface } from 'react-native-paper';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useGoals } from '../contexts/GoalContext';
+import { useGoals } from '../contexts/FirebaseGoalContext';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -14,8 +14,8 @@ type Props = StackScreenProps<RootStackParamList, 'EditGoal'>;
 
 const EditGoalScreen: React.FC<Props> = ({ route, navigation }) => {
   const { goalId } = route.params;
-  const { goalState, updateGoal } = useGoals();
-  const goal = goalState.goals.find((g) => g.id === goalId);
+  const { goals, updateGoal } = useGoals();
+  const goal = goals.find((g) => g.id === goalId);
 
   const [title, setTitle] = useState('');
   const [targetDate, setTargetDate] = useState<Date | null>(null);
@@ -82,7 +82,7 @@ const EditGoalScreen: React.FC<Props> = ({ route, navigation }) => {
   const formatDisplayDate = (date: Date) => {
     return format(date, "MMMM d, yyyy");
   };
-  
+
   const handlePressIn = () => {
     Animated.spring(buttonScale, {
       toValue: 0.98,
@@ -90,7 +90,7 @@ const EditGoalScreen: React.FC<Props> = ({ route, navigation }) => {
       friction: 8,
     }).start();
   };
-  
+
   const handlePressOut = () => {
     Animated.spring(buttonScale, {
       toValue: 1,
@@ -142,7 +142,7 @@ const EditGoalScreen: React.FC<Props> = ({ route, navigation }) => {
 
             <View style={styles.datePickerContainer}>
               <Text style={styles.labelText}>Target Date (Optional)</Text>
-              
+
               <Animated.View style={[
                 styles.dateButtonContainer,
                 { transform: [{ scale: buttonScale }] }
@@ -163,7 +163,7 @@ const EditGoalScreen: React.FC<Props> = ({ route, navigation }) => {
                         <FontAwesome5 name="calendar-alt" size={18} color="#FFFFFF" />
                       </LinearGradient>
                     </View>
-                    
+
                     <View style={styles.dateTextContainer}>
                       {targetDate ? (
                         <>
@@ -178,15 +178,15 @@ const EditGoalScreen: React.FC<Props> = ({ route, navigation }) => {
                         </Text>
                       )}
                     </View>
-                    
-                    <TouchableOpacity 
+
+                    <TouchableOpacity
                       onPress={toggleCalendar}
                       style={styles.arrowButton}
                     >
-                      <FontAwesome5 
-                        name={(Platform.OS === 'ios' && showIOSDatePicker) || (Platform.OS === 'android' && showDatePicker) ? "chevron-down" : "chevron-right"} 
-                        size={16} 
-                        color="#BBBBBB" 
+                      <FontAwesome5
+                        name={(Platform.OS === 'ios' && showIOSDatePicker) || (Platform.OS === 'android' && showDatePicker) ? "chevron-down" : "chevron-right"}
+                        size={16}
+                        color="#BBBBBB"
                       />
                     </TouchableOpacity>
                   </View>
@@ -415,4 +415,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default EditGoalScreen; 
+export default EditGoalScreen;

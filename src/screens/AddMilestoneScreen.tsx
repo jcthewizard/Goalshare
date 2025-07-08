@@ -17,7 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Camera } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome5 } from '@expo/vector-icons';
-import { useGoals } from '../contexts/GoalContext';
+import { useGoals } from '../contexts/FirebaseGoalContext';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation';
 

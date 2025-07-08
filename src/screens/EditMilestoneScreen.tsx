@@ -17,7 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Camera } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome5 } from '@expo/vector-icons';
-import { useGoals } from '../contexts/GoalContext';
+import { useGoals } from '../contexts/FirebaseGoalContext';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation';
 
@@ -27,8 +27,8 @@ type Props = StackScreenProps<RootStackParamList, 'EditMilestone'>;
 
 const EditMilestoneScreen: React.FC<Props> = ({ route, navigation }) => {
   const { goalId, milestoneId } = route.params;
-  const { goalState, updateMilestone } = useGoals();
-  const goal = goalState.goals.find((g) => g.id === goalId);
+  const { goals, updateMilestone } = useGoals();
+  const goal = goals.find((g) => g.id === goalId);
   const milestone = goal?.milestones?.find((m) => m.id === milestoneId);
 
   const [title, setTitle] = useState('');
@@ -475,4 +475,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default EditMilestoneScreen; 
+export default EditMilestoneScreen;

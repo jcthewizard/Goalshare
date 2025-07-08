@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { useTheme, Avatar, IconButton } from 'react-native-paper';
 import { FontAwesome5 } from '@expo/vector-icons';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/FirebaseAuthContext';
 import { format } from 'date-fns';
 
 type CommentModalProps = {
@@ -85,7 +85,9 @@ export const CommentModal: React.FC<CommentModalProps> = ({
           <Text style={styles.commentText}>{item.text}</Text>
         </View>
         <Text style={styles.commentTime}>
-          {format(new Date(item.timestamp), 'MMM d, h:mm a')}
+          {item.timestamp && !isNaN(new Date(item.timestamp).getTime())
+            ? format(new Date(item.timestamp), 'MMM d, h:mm a')
+            : 'Recently'}
         </Text>
       </View>
     </View>

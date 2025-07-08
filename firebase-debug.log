@@ -1,0 +1,101 @@
+[debug] [2025-07-08T06:05:11.273Z] ----------------------------------------------------------------------
+[debug] [2025-07-08T06:05:11.275Z] Command:       /Users/joshchou/.nvm/versions/node/v20.18.3/bin/node /Users/joshchou/.nvm/versions/node/v20.18.3/bin/firebase init
+[debug] [2025-07-08T06:05:11.275Z] CLI Version:   14.9.0
+[debug] [2025-07-08T06:05:11.276Z] Platform:      darwin
+[debug] [2025-07-08T06:05:11.276Z] Node Version:  v20.18.3
+[debug] [2025-07-08T06:05:11.276Z] Time:          Mon Jul 07 2025 23:05:11 GMT-0700 (Pacific Daylight Time)
+[debug] [2025-07-08T06:05:11.276Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-07-08T06:05:11.279Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-07-08T06:05:11.279Z] > authorizing via signed-in user (joshchou777@gmail.com)
+[info] 
+     ######## #### ########  ######## ########     ###     ######  ########
+     ##        ##  ##     ## ##       ##     ##  ##   ##  ##       ##
+     ######    ##  ########  ######   ########  #########  ######  ######
+     ##        ##  ##    ##  ##       ##     ## ##     ##       ## ##
+     ##       #### ##     ## ######## ########  ##     ##  ######  ########
+
+You're about to initialize a Firebase project in this directory:
+
+  /Users/joshchou/repos/Goalshare
+
+[info] 
+=== Project Setup
+[info] 
+[info] First, let's associate this project directory with a Firebase project.
+[info] You can create multiple project aliases by running firebase use --add, 
+[info] but for now we'll just set up a default project.
+[info] 
+[debug] [2025-07-08T06:05:40.030Z] Checked if tokens are valid: true, expires at: 1751958299993
+[debug] [2025-07-08T06:05:40.030Z] Checked if tokens are valid: true, expires at: 1751958299993
+[debug] [2025-07-08T06:05:40.031Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects pageSize=100
+[debug] [2025-07-08T06:05:40.545Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects 200
+[debug] [2025-07-08T06:05:40.545Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects [omitted]
+[info] i  Using project goalshare-app-f7c0b (goalshare-app) 
+[info] 
+=== Dataconnect Setup
+[debug] [2025-07-08T06:05:42.923Z] Checked if tokens are valid: true, expires at: 1751958299993
+[debug] [2025-07-08T06:05:42.923Z] Checked if tokens are valid: true, expires at: 1751958299993
+[debug] [2025-07-08T06:05:42.923Z] >>> [apiv2][query] GET https://cloudbilling.googleapis.com/v1/projects/goalshare-app-f7c0b/billingInfo [none]
+[debug] [2025-07-08T06:05:43.275Z] <<< [apiv2][status] GET https://cloudbilling.googleapis.com/v1/projects/goalshare-app-f7c0b/billingInfo 200
+[debug] [2025-07-08T06:05:43.276Z] <<< [apiv2][body] GET https://cloudbilling.googleapis.com/v1/projects/goalshare-app-f7c0b/billingInfo {"name":"projects/goalshare-app-f7c0b/billingInfo","projectId":"goalshare-app-f7c0b","billingAccountName":"billingAccounts/012321-81FCD6-440F6E","billingEnabled":true}
+[info] i  dataconnect: ensuring required API firebasedataconnect.googleapis.com is enabled... 
+[debug] [2025-07-08T06:05:43.277Z] Checked if tokens are valid: true, expires at: 1751958299993
+[debug] [2025-07-08T06:05:43.277Z] Checked if tokens are valid: true, expires at: 1751958299993
+[debug] [2025-07-08T06:05:43.277Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/goalshare-app-f7c0b/services/firebasedataconnect.googleapis.com [none]
+[debug] [2025-07-08T06:05:43.277Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/goalshare-app-f7c0b/services/firebasedataconnect.googleapis.com x-goog-quota-user=projects/goalshare-app-f7c0b
+[debug] [2025-07-08T06:05:43.721Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/goalshare-app-f7c0b/services/firebasedataconnect.googleapis.com 200
+[debug] [2025-07-08T06:05:43.721Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/goalshare-app-f7c0b/services/firebasedataconnect.googleapis.com [omitted]
+[warn] ⚠  dataconnect: missing required API firebasedataconnect.googleapis.com. Enabling now... 
+[debug] [2025-07-08T06:05:43.722Z] Checked if tokens are valid: true, expires at: 1751958299993
+[debug] [2025-07-08T06:05:43.722Z] Checked if tokens are valid: true, expires at: 1751958299993
+[debug] [2025-07-08T06:05:43.722Z] >>> [apiv2][query] POST https://serviceusage.googleapis.com/v1/projects/goalshare-app-f7c0b/services/firebasedataconnect.googleapis.com:enable [none]
+[debug] [2025-07-08T06:05:43.722Z] >>> [apiv2][(partial)header] POST https://serviceusage.googleapis.com/v1/projects/goalshare-app-f7c0b/services/firebasedataconnect.googleapis.com:enable x-goog-quota-user=projects/goalshare-app-f7c0b
+[debug] [2025-07-08T06:05:44.278Z] <<< [apiv2][status] POST https://serviceusage.googleapis.com/v1/projects/goalshare-app-f7c0b/services/firebasedataconnect.googleapis.com:enable 200
+[debug] [2025-07-08T06:05:44.279Z] <<< [apiv2][body] POST https://serviceusage.googleapis.com/v1/projects/goalshare-app-f7c0b/services/firebasedataconnect.googleapis.com:enable [omitted]
+[info] i  dataconnect: ensuring required API sqladmin.googleapis.com is enabled... 
+[debug] [2025-07-08T06:05:54.295Z] Checked if tokens are valid: true, expires at: 1751958299993
+[debug] [2025-07-08T06:05:54.295Z] Checked if tokens are valid: true, expires at: 1751958299993
+[debug] [2025-07-08T06:05:54.295Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/goalshare-app-f7c0b/services/sqladmin.googleapis.com [none]
+[debug] [2025-07-08T06:05:54.295Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/goalshare-app-f7c0b/services/sqladmin.googleapis.com x-goog-quota-user=projects/goalshare-app-f7c0b
+[debug] [2025-07-08T06:05:54.756Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/goalshare-app-f7c0b/services/sqladmin.googleapis.com 200
+[debug] [2025-07-08T06:05:54.756Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/goalshare-app-f7c0b/services/sqladmin.googleapis.com [omitted]
+[warn] ⚠  dataconnect: missing required API sqladmin.googleapis.com. Enabling now... 
+[debug] [2025-07-08T06:05:54.757Z] Checked if tokens are valid: true, expires at: 1751958299993
+[debug] [2025-07-08T06:05:54.757Z] Checked if tokens are valid: true, expires at: 1751958299993
+[debug] [2025-07-08T06:05:54.757Z] >>> [apiv2][query] POST https://serviceusage.googleapis.com/v1/projects/goalshare-app-f7c0b/services/sqladmin.googleapis.com:enable [none]
+[debug] [2025-07-08T06:05:54.757Z] >>> [apiv2][(partial)header] POST https://serviceusage.googleapis.com/v1/projects/goalshare-app-f7c0b/services/sqladmin.googleapis.com:enable x-goog-quota-user=projects/goalshare-app-f7c0b
+[debug] [2025-07-08T06:05:55.224Z] <<< [apiv2][status] POST https://serviceusage.googleapis.com/v1/projects/goalshare-app-f7c0b/services/sqladmin.googleapis.com:enable 200
+[debug] [2025-07-08T06:05:55.224Z] <<< [apiv2][body] POST https://serviceusage.googleapis.com/v1/projects/goalshare-app-f7c0b/services/sqladmin.googleapis.com:enable [omitted]
+[info] i  dataconnect: ensuring required API compute.googleapis.com is enabled... 
+[debug] [2025-07-08T06:06:05.240Z] Checked if tokens are valid: true, expires at: 1751958299993
+[debug] [2025-07-08T06:06:05.240Z] Checked if tokens are valid: true, expires at: 1751958299993
+[debug] [2025-07-08T06:06:05.241Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/goalshare-app-f7c0b/services/compute.googleapis.com [none]
+[debug] [2025-07-08T06:06:05.241Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/goalshare-app-f7c0b/services/compute.googleapis.com x-goog-quota-user=projects/goalshare-app-f7c0b
+[debug] [2025-07-08T06:06:05.869Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/goalshare-app-f7c0b/services/compute.googleapis.com 200
+[debug] [2025-07-08T06:06:05.869Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/goalshare-app-f7c0b/services/compute.googleapis.com [omitted]
+[warn] ⚠  dataconnect: missing required API compute.googleapis.com. Enabling now... 
+[debug] [2025-07-08T06:06:05.870Z] Checked if tokens are valid: true, expires at: 1751958299993
+[debug] [2025-07-08T06:06:05.870Z] Checked if tokens are valid: true, expires at: 1751958299993
+[debug] [2025-07-08T06:06:05.870Z] >>> [apiv2][query] POST https://serviceusage.googleapis.com/v1/projects/goalshare-app-f7c0b/services/compute.googleapis.com:enable [none]
+[debug] [2025-07-08T06:06:05.870Z] >>> [apiv2][(partial)header] POST https://serviceusage.googleapis.com/v1/projects/goalshare-app-f7c0b/services/compute.googleapis.com:enable x-goog-quota-user=projects/goalshare-app-f7c0b
+[debug] [2025-07-08T06:06:06.316Z] <<< [apiv2][status] POST https://serviceusage.googleapis.com/v1/projects/goalshare-app-f7c0b/services/compute.googleapis.com:enable 200
+[debug] [2025-07-08T06:06:06.316Z] <<< [apiv2][body] POST https://serviceusage.googleapis.com/v1/projects/goalshare-app-f7c0b/services/compute.googleapis.com:enable [omitted]
+[debug] [2025-07-08T06:06:16.333Z] Checked if tokens are valid: true, expires at: 1751958299993
+[debug] [2025-07-08T06:06:16.333Z] Checked if tokens are valid: true, expires at: 1751958299993
+[debug] [2025-07-08T06:06:16.333Z] >>> [apiv2][query] GET https://firebasedataconnect.googleapis.com/v1/projects/goalshare-app-f7c0b/locations/-/services [none]
+[debug] [2025-07-08T06:06:16.968Z] <<< [apiv2][status] GET https://firebasedataconnect.googleapis.com/v1/projects/goalshare-app-f7c0b/locations/-/services 200
+[debug] [2025-07-08T06:06:16.968Z] <<< [apiv2][body] GET https://firebasedataconnect.googleapis.com/v1/projects/goalshare-app-f7c0b/locations/-/services {}
+[debug] [2025-07-08T06:07:41.953Z] ExitPromptError: User force closed the prompt with SIGINT
+    at Interface.sigint (/Users/joshchou/.nvm/versions/node/v20.18.3/lib/node_modules/firebase-tools/node_modules/@inquirer/core/dist/commonjs/lib/create-prompt.js:101:37)
+    at Interface.emit (node:events:518:28)
+    at Interface.emit (node:domain:489:12)
+    at [_ttyWrite] [as _ttyWrite] (node:internal/readline/interface:1125:18)
+    at ReadStream.onkeypress (node:internal/readline/interface:264:20)
+    at ReadStream.emit (node:events:530:35)
+    at ReadStream.emit (node:domain:489:12)
+    at emitKeys (node:internal/readline/utils:371:14)
+    at emitKeys.next (<anonymous>)
+    at ReadStream.onData (node:internal/readline/emitKeypressEvents:64:36)
+[error] 
+[error] Error: An unexpected error has occurred.

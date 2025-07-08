@@ -4,8 +4,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import React from 'react';
 import { Provider as PaperProvider, DefaultTheme } from 'react-native-paper';
 import Navigation from './src/navigation';
-import { AuthProvider } from './src/contexts/AuthContext';
-import { GoalProvider } from './src/contexts/GoalContext';
+import { AuthProvider } from './src/contexts/FirebaseAuthContext';
+import { GoalProvider } from './src/contexts/FirebaseGoalContext';
 import { StatusBar, LogBox } from 'react-native';
 
 // Ignore specific warnings for animation

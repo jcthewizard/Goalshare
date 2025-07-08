@@ -1,9 +1,9 @@
 // @ts-nocheck
 import React, { useState } from 'react';
 import { View, StyleSheet, Alert, ScrollView, SafeAreaView, Platform, StatusBar, TouchableOpacity, ActivityIndicator, Animated } from 'react-native';
-import { TextInput, Button, Title, Switch, Text, Surface } from 'react-native-paper';
+import { TextInput, Button, Title, Switch, Text, Surface, useTheme } from 'react-native-paper';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useGoals } from '../contexts/GoalContext';
+import { useGoals } from '../contexts/FirebaseGoalContext';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -66,7 +66,7 @@ const AddGoalScreen: React.FC<Props> = ({ navigation }) => {
   const formatDisplayDate = (date: Date) => {
     return format(date, "MMMM d, yyyy");
   };
-  
+
   const handlePressIn = () => {
     Animated.spring(buttonScale, {
       toValue: 0.98,
@@ -74,7 +74,7 @@ const AddGoalScreen: React.FC<Props> = ({ navigation }) => {
       friction: 8,
     }).start();
   };
-  
+
   const handlePressOut = () => {
     Animated.spring(buttonScale, {
       toValue: 1,
@@ -118,7 +118,7 @@ const AddGoalScreen: React.FC<Props> = ({ navigation }) => {
 
             <View style={styles.datePickerContainer}>
               <Text style={styles.labelText}>Target Date (Optional)</Text>
-              
+
               <Animated.View style={[
                 styles.dateButtonContainer,
                 { transform: [{ scale: buttonScale }] }
@@ -139,7 +139,7 @@ const AddGoalScreen: React.FC<Props> = ({ navigation }) => {
                         <FontAwesome5 name="calendar-alt" size={18} color="#FFFFFF" />
                       </LinearGradient>
                     </View>
-                    
+
                     <View style={styles.dateTextContainer}>
                       {targetDate ? (
                         <>
@@ -154,15 +154,15 @@ const AddGoalScreen: React.FC<Props> = ({ navigation }) => {
                         </Text>
                       )}
                     </View>
-                    
-                    <TouchableOpacity 
+
+                    <TouchableOpacity
                       onPress={toggleCalendar}
                       style={styles.arrowButton}
                     >
-                      <FontAwesome5 
-                        name={(Platform.OS === 'ios' && showIOSDatePicker) || (Platform.OS === 'android' && showDatePicker) ? "chevron-down" : "chevron-right"} 
-                        size={16} 
-                        color="#BBBBBB" 
+                      <FontAwesome5
+                        name={(Platform.OS === 'ios' && showIOSDatePicker) || (Platform.OS === 'android' && showDatePicker) ? "chevron-down" : "chevron-right"}
+                        size={16}
+                        color="#BBBBBB"
                       />
                     </TouchableOpacity>
                   </View>

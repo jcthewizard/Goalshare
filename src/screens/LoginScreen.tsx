@@ -12,7 +12,7 @@ import {
   LayoutAnimation,
 } from 'react-native';
 import { TextInput, Button, Title, Surface } from 'react-native-paper';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/FirebaseAuthContext';
 import { StackScreenProps } from '@react-navigation/stack';
 import { AuthStackParamList } from '../navigation';
 

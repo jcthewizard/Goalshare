@@ -32,16 +32,16 @@ try {
   // Check if .env already exists
   if (fs.existsSync(envPath)) {
     console.log('⚠️  .env file already exists');
-    
+
     // Read existing content to check MONGO_URI
     const existingContent = fs.readFileSync(envPath, 'utf8');
     const mongoUriMatch = existingContent.match(/MONGO_URI=(.+)/);
-    
+
     if (mongoUriMatch) {
       const currentUri = mongoUriMatch[1];
       console.log('📋 Current MONGO_URI:');
       console.log(`   ${currentUri}\n`);
-      
+
       if (currentUri.includes('xxxxx') || currentUri.includes('<password>')) {
         console.log('❌ Your MONGO_URI needs to be updated with real values!');
         console.log('📝 You need to:');
@@ -59,20 +59,26 @@ try {
     // Create new .env file
     fs.writeFileSync(envPath, envContent);
     console.log('✅ Created .env file\n');
-    
+
     console.log('📝 Next steps:');
     console.log('1. Go to https://cloud.mongodb.com/');
     console.log('2. Sign up for free account');
     console.log('3. Create a new cluster (M0 FREE tier)');
     console.log('4. Create database user: goalshare / goalshare123');
     console.log('5. Set network access to 0.0.0.0/0 (allow from anywhere)');
+    console.log('   → Go to "Network Access" → "Add IP Address" → "Allow Access from Anywhere"');
     console.log('6. Get connection string and update MONGO_URI in .env');
     console.log('7. Run: npm start\n');
+
+    console.log('🌐 For device access configuration:');
+    console.log('   → MongoDB Atlas: Network Access → 0.0.0.0/0 (allows all devices)');
+    console.log('   → Backend CORS: Already configured for development');
+    console.log('   → Make sure your devices are on the same network\n');
   }
 
   console.log('🎯 Example of correct MONGO_URI format:');
   console.log('mongodb+srv://goalshare:goalshare123@cluster0.ab1cd.mongodb.net/goalshare?retryWrites=true&w=majority\n');
-  
+
   console.log('🔧 To edit .env file:');
   console.log('   code .env    (if you have VS Code)');
   console.log('   nano .env    (command line editor)');
@@ -83,4 +89,4 @@ try {
 }
 
 console.log('📚 Need detailed setup instructions?');
-console.log('   Visit: https://docs.mongodb.com/atlas/getting-started/'); 
+console.log('   Visit: https://docs.mongodb.com/atlas/getting-started/');
