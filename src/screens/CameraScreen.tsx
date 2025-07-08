@@ -314,18 +314,7 @@ export default function CameraScreen({ navigation }: Props) {
                 >
                   <Ionicons name="camera-reverse" size={30} color="white" />
                 </TouchableOpacity>
-                {/* Double-tap hint */}
-                <View style={styles.doubleTapHint}>
-                  <Text style={styles.doubleTapText}>Double-tap to switch</Text>
-                </View>
               </View>
-
-              {/* Camera switching indicator */}
-              {isSwitchingCamera && (
-                <View style={styles.switchingIndicator}>
-                  <Text style={styles.switchingText}>Switching camera...</Text>
-                </View>
-              )}
 
               <View style={styles.cameraBottomControls}>
                 <TouchableOpacity style={styles.galleryButton} onPress={pickImage}>
@@ -751,37 +740,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginRight: 6,
-  },
-  doubleTapHint: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 50 : 20,
-    left: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  doubleTapText: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 12,
-    fontWeight: '500',
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
-  switchingIndicator: {
-    position: 'absolute',
-    top: '50%',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    transform: [{ translateY: -20 }],
-  },
-  switchingText: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 12,
-    fontWeight: '500',
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
   },
 });
