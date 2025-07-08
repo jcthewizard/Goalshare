@@ -759,24 +759,11 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                               {/* Milestone content */}
                               <Card style={[
                                 styles.milestoneCard,
-                                milestone.isMilestone ? [
-                                  styles.milestoneTimelineCard,
-                                  { borderLeftColor: themeColors.accent }
-                                ] : null
                               ]}>
-                                {milestone.isMilestone ? (
-                                  <LinearGradient
-                                    colors={[themeColors.accent + '20', '#FFFCF3']}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 0 }}
-                                    style={styles.milestoneCardGradient}
-                                  />
-                                ) : null}
                                 <Card.Content>
                                   <View style={styles.milestoneHeader}>
                                     <Title style={[
                                       styles.milestoneTitle,
-                                      milestone.isMilestone ? { color: themeColors.accent } : null
                                     ]}>
                                       {milestone.title}
                                     </Title>
@@ -1381,14 +1368,6 @@ const styles = StyleSheet.create({
     paddingTop: 3,
     paddingBottom: 0,
   },
-  milestoneCardGradient: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 10,
-  },
   milestoneTimelineCard: {
     borderLeftWidth: 3,
     borderLeftColor: '#FFD700',
@@ -1421,11 +1400,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 3,
     borderColor: '#FFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 5,
     zIndex: 3,
   },
   shimmerOverlay: {
