@@ -344,6 +344,21 @@ const styles = StyleSheet.create({
   completedGoalsContainer: {
     overflow: 'hidden',
   },
+  completedGoalCardContainer: {
+    opacity: 0.8,
+  },
+  completedGoalTitle: {
+    color: '#666',
+  },
+  completedGoalInfoText: {
+    color: '#666',
+  },
+  completedProgressBar: {
+    backgroundColor: '#4CAF50',
+  },
+  completedProgressText: {
+    color: '#666',
+  },
 });
 
 // Daily Quote Component with improved design
@@ -411,6 +426,41 @@ const ListHeaderComponent = ({ user }) => (
   </View>
 );
 
+// Helper function to get the latest activity date for a goal
+const getLatestActivityDate = (goal: Goal): Date => {
+  const dates = [];
+
+  // Add goal creation date
+  if (goal.createdAt) {
+    dates.push(new Date(goal.createdAt));
+  }
+
+  // Add milestone dates - with null check
+  if (goal.milestones && Array.isArray(goal.milestones) && goal.milestones.length > 0) {
+    goal.milestones.forEach(milestone => {
+      if (milestone && milestone.createdAt) {
+        dates.push(new Date(milestone.createdAt));
+      }
+    });
+  }
+
+  // Add timeline item dates (these represent completed activities) - with null check
+  if (goal.timeline && Array.isArray(goal.timeline) && goal.timeline.length > 0) {
+    goal.timeline.forEach(item => {
+      if (item && item.createdAt) {
+        dates.push(new Date(item.createdAt));
+      }
+    });
+  }
+
+  // Return the most recent date, or goal creation date as fallback
+  if (dates.length === 0) {
+    return goal.createdAt ? new Date(goal.createdAt) : new Date();
+  }
+
+  return new Date(Math.max(...dates.map(date => date.getTime())));
+};
+
 // Define HomeScreen as a separate function to fix return type error
 function HomeScreen({ navigation }: Props): React.ReactElement {
   const goalContext = useGoals();
@@ -426,9 +476,30 @@ function HomeScreen({ navigation }: Props): React.ReactElement {
   const completedDropdownAnim = useRef(new Animated.Value(0)).current;
   const theme = useTheme();
 
-  // Filter goals into active and completed
-  const activeGoals = goals.filter(g => !g.isCompleted).sort((a, b) => (b.isPinned || 0) - (a.isPinned || 0));
-  const completedGoals = goals.filter(g => g.isCompleted);
+  // Filter goals into active and completed - sort unpinned by latest activity
+  const activeGoals = (() => {
+    if (!goals || !Array.isArray(goals)) return [];
+
+    const active = goals.filter(g => g && !g.isCompleted);
+    const pinned = active.filter(g => g.isPinned);
+    const unpinned = active.filter(g => !g.isPinned);
+
+    // Sort unpinned goals by latest activity (most recent first)
+    const sortedUnpinned = unpinned.sort((a, b) => {
+      try {
+        const aLatest = getLatestActivityDate(a);
+        const bLatest = getLatestActivityDate(b);
+        return bLatest.getTime() - aLatest.getTime();
+      } catch (error) {
+        console.warn('Error sorting goals by activity:', error);
+        return 0; // Keep original order if there's an error
+      }
+    });
+
+    // Return pinned goals first, then sorted unpinned goals
+    return [...pinned, ...sortedUnpinned];
+  })();
+  const completedGoals = goals.filter(g => g && g.isCompleted);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -510,7 +581,15 @@ function HomeScreen({ navigation }: Props): React.ReactElement {
           style: "default",
           onPress: async () => {
             try {
-              await updateGoal(goalId, { isCompleted: true, completedDate: new Date() });
+              await updateGoal(goalId, {
+                completed: true, // Use 'completed' for backend compatibility
+                isCompleted: true, // Keep both for safety
+                completedDate: new Date()
+              });
+              // Refresh goals to update UI
+              if (goalContext.getGoals) {
+                await goalContext.getGoals();
+              }
             } catch (error) {
               Alert.alert("Error", "Failed to complete goal. Please try again.");
             }
@@ -545,17 +624,17 @@ function HomeScreen({ navigation }: Props): React.ReactElement {
         setActiveDropdown(null);
         dropdownAnim.setValue(0);
       }
-      
+
       // Determine if dropdown should appear above or below based on position in list
       const totalGoals = goals.length;
       const shouldShowAbove = index >= Math.floor(totalGoals / 2) && index >= totalGoals - 3;
-      
+
       // Calculate approximate position based on index and card height
       const headerHeight = 220; // Approximate header height
       const cardHeight = 160; // Approximate card height including margins
       const cardSpacing = 16;
       const estimatedTop = headerHeight + (index * (cardHeight + cardSpacing)) + 60;
-      
+
       setDropdownPosition(prev => ({
         ...prev,
         [goalId]: {
@@ -564,7 +643,7 @@ function HomeScreen({ navigation }: Props): React.ReactElement {
           position: shouldShowAbove ? 'above' : 'below'
         }
       }));
-      
+
       // Open dropdown with spring animation
       setActiveDropdown(goalId);
       Animated.spring(dropdownAnim, {
@@ -660,6 +739,59 @@ function HomeScreen({ navigation }: Props): React.ReactElement {
     );
   };
 
+  // Render function for completed goals - non-clickable and greyed out
+  const renderCompletedItem = ({ item, index }) => {
+    // Calculate completion percentage (should be 100% for completed goals)
+    const totalMilestones = (item.milestones?.length || 0) + (item.timeline?.length || 0);
+    const completedMilestones = item.timeline?.length || 0;
+    const completionPercentage = totalMilestones > 0 ? Math.round((completedMilestones / totalMilestones) * 100) : 100;
+
+    return (
+      <View
+        key={item.id}
+        style={[styles.goalCardContainer, styles.completedGoalCardContainer]}
+      >
+        <LinearGradient
+          colors={['#E0E0E0', '#F5F5F5']} // Grey gradient for completed goals
+          style={styles.goalCard}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <View style={styles.goalCardContent}>
+            <View style={styles.goalTitleRow}>
+              <Text style={[styles.goalTitle, styles.completedGoalTitle]}>{item.title}</Text>
+              <View style={styles.goalActions}>
+                <FontAwesome5 name="check-circle" size={16} color="#4CAF50" />
+              </View>
+            </View>
+
+            <View style={styles.goalInfoContainer}>
+              <View style={styles.goalInfo}>
+                <FontAwesome5 name="calendar-check" size={14} color="#666" />
+                <Text style={[styles.goalInfoText, styles.completedGoalInfoText]}>
+                  Completed {item.completedDate ? new Date(item.completedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
+                </Text>
+              </View>
+
+              <View style={styles.goalInfo}>
+                <FontAwesome5 name="tasks" size={14} color="#666" />
+                <Text style={[styles.goalInfoText, styles.completedGoalInfoText]}>
+                  {completedMilestones}/{totalMilestones}
+                </Text>
+              </View>
+            </View>
+
+            {/* Progress bar - always 100% for completed goals */}
+            <View style={styles.progressBarContainer}>
+              <View style={[styles.progressBar, styles.completedProgressBar, { width: '100%' }]} />
+              <Text style={[styles.progressText, styles.completedProgressText]}>✓ Complete</Text>
+            </View>
+          </View>
+        </LinearGradient>
+      </View>
+    );
+  };
+
   const ListEmptyComponent = () => (
     <View style={styles.emptyContainer}>
       <View style={styles.emptyIconContainer}>
@@ -689,7 +821,7 @@ function HomeScreen({ navigation }: Props): React.ReactElement {
 
     return (
       <View style={styles.completedGoalsSection}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.completedGoalsHeader}
           onPress={() => setShowCompletedGoals(!showCompletedGoals)}
         >
@@ -720,7 +852,7 @@ function HomeScreen({ navigation }: Props): React.ReactElement {
             }
           ]}
         >
-          {showCompletedGoals && completedGoals.map((item, index) => renderItem({ item, index }))}
+          {showCompletedGoals && completedGoals.map((item, index) => renderCompletedItem({ item, index }))}
         </Animated.View>
       </View>
     );
@@ -790,9 +922,9 @@ function HomeScreen({ navigation }: Props): React.ReactElement {
                   <FontAwesome5 name="check-circle" size={14} color="#4CAF50" />
                   <Text style={[styles.dropdownOptionText, { color: '#4CAF50' }]}>Complete Goal</Text>
                 </TouchableOpacity>
-                
+
                 <View style={styles.dropdownSeparator} />
-                
+
                 <TouchableOpacity
                   style={styles.dropdownOption}
                   onPress={(e) => {
@@ -807,9 +939,9 @@ function HomeScreen({ navigation }: Props): React.ReactElement {
                   <FontAwesome5 name="edit" size={14} color="#666" />
                   <Text style={styles.dropdownOptionText}>Edit Goal</Text>
                 </TouchableOpacity>
-                
+
                 <View style={styles.dropdownSeparator} />
-                
+
                 <TouchableOpacity
                   style={styles.dropdownOption}
                   onPress={(e) => {
@@ -824,18 +956,18 @@ function HomeScreen({ navigation }: Props): React.ReactElement {
                     }, 200);
                   }}
                 >
-                  <FontAwesome5 
-                    name="thumbtack" 
-                    size={14} 
-                    color={goals.find(g => g.id === activeDropdown)?.isPinned ? "#000000" : "#666"} 
+                  <FontAwesome5
+                    name="thumbtack"
+                    size={14}
+                    color={goals.find(g => g.id === activeDropdown)?.isPinned ? "#000000" : "#666"}
                   />
                   <Text style={[styles.dropdownOptionText, { color: goals.find(g => g.id === activeDropdown)?.isPinned ? "#000000" : "#666" }]}>
                     {goals.find(g => g.id === activeDropdown)?.isPinned ? "Unpin Goal" : "Pin Goal"}
                   </Text>
                 </TouchableOpacity>
-                
+
                 <View style={styles.dropdownSeparator} />
-                
+
                 <TouchableOpacity
                   style={styles.dropdownOption}
                   onPress={(e) => {

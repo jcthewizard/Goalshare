@@ -204,7 +204,7 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
       console.log('🔍 GOALS: Fetching goals with token:', token ? 'Token exists' : 'No token');
-      
+
       // Explicitly set the auth header for this request
       const config = {
         headers: {
@@ -212,16 +212,18 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
           'Content-Type': 'application/json'
         }
       };
-      
+
       console.log('🔑 GOALS: Using headers:', config.headers);
       const res = await axios.get(`${API_URL}/goals`, config);
-      
+
       // Transform backend format to frontend format
       const transformedGoals = res.data.map((goal: any) => ({
         id: goal._id,
         title: goal.title,
         targetDate: goal.targetDate,
         isPinned: goal.isPinned,
+        isCompleted: goal.completed || goal.isCompleted,
+        completedDate: goal.completedDate,
         themeColors: goal.themeColors || {
           primary: '#FF5F5F',
           secondary: '#FF8C8C',
@@ -245,7 +247,7 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
         })) || [],
         createdAt: goal.createdAt
       }));
-      
+
       dispatch({ type: 'SET_GOALS', payload: transformedGoals });
     } catch (error) {
       console.error('Get goals error:', error);
@@ -258,13 +260,15 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
       const res = await axios.get(`${API_URL}/goals/${id}`);
-      
+
       // Transform backend format to frontend format
       const transformedGoal = {
         id: res.data._id,
         title: res.data.title,
         targetDate: res.data.targetDate,
         isPinned: res.data.isPinned,
+        isCompleted: res.data.completed || res.data.isCompleted,
+        completedDate: res.data.completedDate,
         themeColors: res.data.themeColors || {
           primary: '#FF5F5F',
           secondary: '#FF8C8C',
@@ -288,7 +292,7 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
         })) || [],
         createdAt: res.data.createdAt
       };
-      
+
       dispatch({ type: 'SET_LOADING', payload: false });
       return transformedGoal;
     } catch (error) {
@@ -303,13 +307,15 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
       const res = await axios.post(`${API_URL}/goals`, goal);
-      
+
       // Transform backend format to frontend format
       const transformedGoal = {
         id: res.data._id,
         title: res.data.title,
         targetDate: res.data.targetDate,
         isPinned: res.data.isPinned,
+        isCompleted: res.data.completed || res.data.isCompleted,
+        completedDate: res.data.completedDate,
         themeColors: res.data.themeColors || {
           primary: '#FF5F5F',
           secondary: '#FF8C8C',
@@ -333,7 +339,7 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
         })) || [],
         createdAt: res.data.createdAt
       };
-      
+
       dispatch({ type: 'ADD_GOAL', payload: transformedGoal });
       return transformedGoal;
     } catch (error) {
@@ -350,13 +356,15 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
       dispatch({ type: 'SET_LOADING', payload: true });
       const res = await axios.put(`${API_URL}/goals/${id}`, goal);
       console.log('📥 Update goal response:', res.data);
-      
+
       // Transform backend format to frontend format
       const transformedGoal = {
         id: res.data._id,
         title: res.data.title,
         targetDate: res.data.targetDate,
         isPinned: res.data.isPinned,
+        isCompleted: res.data.completed || res.data.isCompleted,
+        completedDate: res.data.completedDate,
         themeColors: res.data.themeColors || {
           primary: '#FF5F5F',
           secondary: '#FF8C8C',
@@ -380,7 +388,7 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
         })) || [],
         createdAt: res.data.createdAt
       };
-      
+
       dispatch({ type: 'UPDATE_GOAL', payload: transformedGoal });
       return transformedGoal;
     } catch (error) {
@@ -408,7 +416,7 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
       const res = await axios.post(`${API_URL}/goals/${goalId}/milestones`, milestone);
-      
+
       // Transform backend format to frontend format
       const transformedMilestone = {
         id: res.data._id,
@@ -418,12 +426,12 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isMilestone: res.data.isMilestone,
         createdAt: res.data.createdAt
       };
-      
+
       dispatch({
         type: 'ADD_MILESTONE',
         payload: { goalId, milestone: transformedMilestone }
       });
-      
+
       return transformedMilestone;
     } catch (error) {
       console.error('Add milestone error:', error);
@@ -437,7 +445,7 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
       const res = await axios.put(`${API_URL}/goals/${goalId}/milestones/${milestoneId}`, milestone);
-      
+
       // Transform backend format to frontend format
       const transformedMilestone = {
         id: res.data._id,
@@ -447,12 +455,12 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isMilestone: res.data.isMilestone,
         createdAt: res.data.createdAt
       };
-      
+
       dispatch({
         type: 'UPDATE_MILESTONE',
         payload: { goalId, milestoneId, milestone: transformedMilestone }
       });
-      
+
       return transformedMilestone;
     } catch (error) {
       console.error('Update milestone error:', error);
@@ -482,7 +490,7 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
       const res = await axios.post(`${API_URL}/goals/${goalId}/timeline`, item);
-      
+
       // Transform backend format to frontend format
       const transformedItem = {
         id: res.data._id,
@@ -492,12 +500,12 @@ export const GoalProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isMilestone: res.data.isMilestone,
         createdAt: res.data.createdAt
       };
-      
+
       dispatch({
         type: 'ADD_TIMELINE_ITEM',
         payload: { goalId, item: transformedItem }
       });
-      
+
       return transformedItem;
     } catch (error) {
       console.error('Add timeline item error:', error);
