@@ -342,7 +342,7 @@ const SwipeableScreen = ({ children, navigation, screenName }) => {
 };
 
 // Animated Tab Navigator with smooth swipe transitions
-const AnimatedTabNavigator = () => {
+const AnimatedTabNavigator = ({ navigation: stackNavigation }) => {
   const tabNames = ['Home', 'Camera', 'Profile'];
   const screenWidth = SCREEN_WIDTH; // Make screen width accessible in component scope
   const currentTabIndex = useSharedValue(0);
@@ -442,20 +442,7 @@ const AnimatedTabNavigator = () => {
 
   const renderTabContent = (tabName, index) => {
     const screenProps = {
-      navigation: {
-        jumpTo: (targetTab) => {
-          const targetIndex = tabNames.indexOf(targetTab);
-          if (targetIndex !== -1) {
-            navigateToTab(targetIndex, false); // Keep animation for programmatic navigation
-          }
-        },
-        navigate: (targetTab) => {
-          const targetIndex = tabNames.indexOf(targetTab);
-          if (targetIndex !== -1) {
-            navigateToTab(targetIndex, false); // Keep animation for programmatic navigation
-          }
-        },
-      },
+      navigation: stackNavigation, // Pass the real stack navigation object
       route: { name: tabName },
     };
 
@@ -473,10 +460,18 @@ const AnimatedTabNavigator = () => {
 
   return (
     <View style={{ flex: 1 }}>
+      {/* Re-enable GestureDetector for swiping functionality */}
       <GestureDetector gesture={panGesture}>
         <Animated.View style={[{ flex: 1, flexDirection: 'row', width: screenWidth * tabNames.length }, animatedStyle]}>
           {tabNames.map((tabName, index) => (
-            <View key={tabName} style={{ width: screenWidth, flex: 1 }}>
+            <View
+              key={tabName}
+              style={{
+                width: screenWidth,
+                flex: 1
+              }}
+              pointerEvents={activeTabIndex === index ? 'auto' : 'none'} // Only allow touches on active tab
+            >
               {renderTabContent(tabName, index)}
             </View>
           ))}
@@ -541,8 +536,8 @@ const AnimatedTabNavigator = () => {
 };
 
 // Main tab navigator with swipe-enabled screens
-const MainTabNavigator = () => (
-  <AnimatedTabNavigator />
+const MainTabNavigator = ({ navigation }) => (
+  <AnimatedTabNavigator navigation={navigation} />
 );
 
 // Root navigator
