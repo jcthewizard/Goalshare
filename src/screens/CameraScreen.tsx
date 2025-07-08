@@ -188,8 +188,7 @@ export default function CameraScreen({ navigation }: Props) {
       });
 
       resetCapture();
-      navigation.navigate('Home');
-      Alert.alert('Success', 'Added to your timeline!');
+      navigation.navigate('Main', { screen: 'Home' });
     } catch (error) {
       Alert.alert('Error', 'Failed to add to timeline');
     }

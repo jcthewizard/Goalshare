@@ -40,8 +40,8 @@ const AddGoalScreen: React.FC<Props> = ({ navigation }) => {
 
       await addGoal(goalData);
 
-      // Navigate back directly without showing an alert
-      navigation.goBack();
+      // Navigate back to the home screen
+      navigation.navigate('Main', { screen: 'Home' });
     } catch (error) {
       Alert.alert('Error', error instanceof Error ? error.message : 'Failed to create goal');
       setLoading(false);

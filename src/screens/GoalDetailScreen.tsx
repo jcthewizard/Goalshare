@@ -253,43 +253,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
     }
   };
 
-  // Add this after your other useRefs
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const shimmerAnim = useRef(new Animated.Value(0)).current;
-
-  // Add this useEffect for the pulsing animation
-  useEffect(() => {
-    // Create a loop animation for the pulsing effect
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.2,
-          duration: 1000,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.ease),
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-          easing: Easing.in(Easing.ease),
-        }),
-      ])
-    ).start();
-  }, []);
-
-  // Add this useEffect for the shimmer animation
-  useEffect(() => {
-    // Create a loop animation for the shimmer effect
-    Animated.loop(
-      Animated.timing(shimmerAnim, {
-        toValue: 1,
-        duration: 1500,
-        useNativeDriver: false,
-        easing: Easing.linear,
-      })
-    ).start();
-  }, []);
+  
 
   // Toggle color picker
   const toggleColorPicker = () => {
@@ -786,18 +750,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                                 }
                               ]}>
                                 {milestone.isMilestone ? (
-                                  <Animated.View style={[
-                                    styles.shimmerOverlay,
-                                    {
-                                      opacity: shimmerAnim.interpolate({
-                                        inputRange: [0, 0.5, 1],
-                                        outputRange: [0.1, 0.3, 0.1]
-                                      })
-                                    }
-                                  ]} />
-                                ) : null}
-                                {milestone.isMilestone ? (
-                                  <FontAwesome5 name="star" size={16} color={themeColors.accent} />
+                                  <FontAwesome5 name="star" size={16} color="#FFF" />
                                 ) : (
                                   <FontAwesome5 name="check" size={14} color="#FFF" />
                                 )}
@@ -812,68 +765,12 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                                 ] : null
                               ]}>
                                 {milestone.isMilestone ? (
-                                  <>
-                                                        <LinearGradient
-                        colors={[themeColors.accent + '20', '#FFFCF3']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.milestoneCardGradient}
-                      />
-                                      <Animated.View
-                                        style={[
-                                          styles.milestoneFireBorder,
-                                          { transform: [{ scale: pulseAnim }] }
-                                        ]}
-                                      >
-                                        <LinearGradient
-                                          colors={[themeColors.primary, themeColors.secondary, themeColors.accent]}
-                                          start={{ x: 0, y: 0 }}
-                                          end={{ x: 0, y: 1 }}
-                                          style={styles.fireGradient}
-                                        />
-                                      </Animated.View>
-
-                                      {/* Sparkle effects for milestone */}
-                                      <View style={styles.sparkleContainer}>
-                                        <Animated.View style={[
-                                          styles.sparkle,
-                                          styles.sparkleTopRight,
-                                          {
-                                            opacity: shimmerAnim.interpolate({
-                                              inputRange: [0, 0.3, 0.6, 1],
-                                              outputRange: [0, 1, 0.5, 0]
-                                            }),
-                                            transform: [{
-                                              scale: shimmerAnim.interpolate({
-                                                inputRange: [0, 0.5, 1],
-                                                outputRange: [0.7, 1.2, 0.7]
-                                              })
-                                            }]
-                                          }
-                                        ]}>
-                                          <FontAwesome5 name="sparkles" size={16} color={themeColors.accent} />
-                                        </Animated.View>
-
-                                        <Animated.View style={[
-                                          styles.sparkle,
-                                          styles.sparkleBottomLeft,
-                                          {
-                                            opacity: shimmerAnim.interpolate({
-                                              inputRange: [0, 0.5, 0.8, 1],
-                                              outputRange: [0, 0.5, 1, 0]
-                                            }),
-                                            transform: [{
-                                              scale: shimmerAnim.interpolate({
-                                                inputRange: [0, 0.5, 1],
-                                                outputRange: [0.8, 1.1, 0.8]
-                                              })
-                                            }]
-                                          }
-                                        ]}>
-                                          <FontAwesome5 name="star" size={12} color={themeColors.accent} />
-                                        </Animated.View>
-                                      </View>
-                                    </>
+                                  <LinearGradient
+                                    colors={[themeColors.accent + '20', '#FFFCF3']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    style={styles.milestoneCardGradient}
+                                  />
                                 ) : null}
                                 <Card.Content>
                                   <View style={styles.milestoneHeader}>

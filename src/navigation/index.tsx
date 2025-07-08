@@ -342,13 +342,24 @@ const SwipeableScreen = ({ children, navigation, screenName }) => {
 };
 
 // Animated Tab Navigator with smooth swipe transitions
-const AnimatedTabNavigator = ({ navigation: stackNavigation }) => {
+const AnimatedTabNavigator = ({ navigation: stackNavigation, route }) => {
   const tabNames = ['Home', 'Camera', 'Profile'];
   const screenWidth = SCREEN_WIDTH; // Make screen width accessible in component scope
   const currentTabIndex = useSharedValue(0);
   const translateX = useSharedValue(0);
   const isDragging = useSharedValue(false);
   const [activeTabIndex, setActiveTabIndex] = React.useState(0); // Track active tab for icons
+
+  React.useEffect(() => {
+    if (route.params?.screen) {
+      const targetTabIndex = tabNames.indexOf(route.params.screen);
+      if (targetTabIndex !== -1) {
+        navigateToTab(targetTabIndex, true);
+        // Important: clear the param to avoid re-triggering
+        stackNavigation.setParams({ screen: undefined });
+      }
+    }
+  }, [route.params?.screen]);
 
   // Navigation function that runs on JS thread
   const navigateToTab = (targetIndex, instant = false) => {
@@ -536,8 +547,8 @@ const AnimatedTabNavigator = ({ navigation: stackNavigation }) => {
 };
 
 // Main tab navigator with swipe-enabled screens
-const MainTabNavigator = ({ navigation }) => (
-  <AnimatedTabNavigator navigation={navigation} />
+const MainTabNavigator = ({ navigation, route }) => (
+  <AnimatedTabNavigator navigation={navigation} route={route} />
 );
 
 // Root navigator
