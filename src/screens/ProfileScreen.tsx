@@ -142,60 +142,6 @@ const ProfileScreen = () => {
               </LinearGradient>
             </Card>
           </View>
-
-          {/* Completion Rates */}
-          <Card style={styles.completionCard}>
-            <Card.Content>
-              <View style={styles.completionHeader}>
-                <Text style={styles.completionTitle}>Completion Rates</Text>
-              </View>
-
-              {/* Goals Completion */}
-              <View style={styles.completionSection}>
-                <View style={styles.completionLabelRow}>
-                  <Text style={styles.completionLabel}>Goals</Text>
-                  <Text style={styles.completionPercent}>{goalCompletionRate}%</Text>
-                </View>
-                <View style={styles.progressBarContainer}>
-                  <View
-                    style={[
-                      styles.progressBar,
-                      { width: `${goalCompletionRate}%`, backgroundColor: theme.colors.primary }
-                    ]}
-                  />
-                </View>
-              </View>
-
-              {/* Milestones Completion */}
-              <View style={styles.completionSection}>
-                <View style={styles.completionLabelRow}>
-                  <Text style={styles.completionLabel}>Milestones</Text>
-                  <Text style={styles.completionPercent}>{milestoneCompletionRate}%</Text>
-                </View>
-                <View style={styles.progressBarContainer}>
-                  <View
-                    style={[
-                      styles.progressBar,
-                      { width: `${milestoneCompletionRate}%`, backgroundColor: theme.colors.accent }
-                    ]}
-                  />
-                </View>
-              </View>
-
-              {/* Total Stats */}
-              <View style={styles.totalStatsContainer}>
-                <View style={styles.totalStatItem}>
-                  <Text style={styles.totalStatLabel}>Total Milestones</Text>
-                  <Text style={styles.totalStatValue}>{totalMilestones}</Text>
-                </View>
-                <View style={styles.totalStatDivider} />
-                <View style={styles.totalStatItem}>
-                  <Text style={styles.totalStatLabel}>Completed</Text>
-                  <Text style={styles.totalStatValue}>{completedMilestones}</Text>
-                </View>
-              </View>
-            </Card.Content>
-          </Card>
         </View>
 
         {renderLogoutButton()}

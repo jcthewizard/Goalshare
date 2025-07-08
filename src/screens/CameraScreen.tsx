@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -24,6 +24,7 @@ import { useGoals } from '../contexts/GoalContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MainTabParamList } from '../navigation';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -31,7 +32,7 @@ type Props = BottomTabScreenProps<MainTabParamList, 'Camera'>;
 
 export default function CameraScreen({ navigation }: Props) {
   const [permission, requestPermission] = useCameraPermissions();
-  const [type, setType] = useState('back');
+  const [facing, setFacing] = useState<'front' | 'back'>('back');
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isCameraFrozen, setIsCameraFrozen] = useState(false);
   const [caption, setCaption] = useState('');
@@ -43,6 +44,40 @@ export default function CameraScreen({ navigation }: Props) {
   const cameraRef = useRef<any>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const captionInputRef = useRef<TextInput>(null);
+  const goalPickerAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  const modalOpacity = goalPickerAnim.interpolate({
+    inputRange: [0, SCREEN_HEIGHT],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
+  const doubleTap = Gesture.Tap()
+    .numberOfTaps(2)
+    .onEnd(() => {
+      if (!isCameraFrozen) {
+        setFacing(current => (current === 'back' ? 'front' : 'back'));
+      }
+    });
+
+  useEffect(() => {
+    if (showGoalPicker) {
+      Animated.timing(goalPickerAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [showGoalPicker]);
+
+  const closeGoalPicker = () => {
+    Animated.timing(goalPickerAnim, {
+      toValue: SCREEN_HEIGHT,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowGoalPicker(false);
+    });
+  };
 
   const takePicture = async () => {
     if (cameraRef.current && !isCameraFrozen) {
@@ -88,6 +123,17 @@ export default function CameraScreen({ navigation }: Props) {
   };
 
   const pickImage = async () => {
+    if (cameraRef.current) {
+      try {
+        // Pause preview to hold the frame
+        await cameraRef.current.pausePreview();
+      } catch (e) {
+        console.log('Could not pause preview:', e);
+      }
+    }
+    // Freeze UI to show the editing controls
+    setIsCameraFrozen(true);
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
@@ -97,7 +143,9 @@ export default function CameraScreen({ navigation }: Props) {
 
     if (!result.canceled) {
       setCapturedImage(result.assets[0].uri);
-      setIsCameraFrozen(true);
+    } else {
+      // User cancelled, so unfreeze and resume preview
+      resetCapture();
     }
   };
 
@@ -188,12 +236,16 @@ export default function CameraScreen({ navigation }: Props) {
     <Modal
       visible={showGoalPicker}
       transparent
-      animationType="slide"
+      animationType="none"
+      onRequestClose={closeGoalPicker}
     >
-      <TouchableWithoutFeedback onPress={() => setShowGoalPicker(false)}>
-        <View style={styles.modalOverlay}>
+      <TouchableWithoutFeedback onPress={closeGoalPicker}>
+        <Animated.View style={[styles.modalOverlay, { opacity: modalOpacity }]}>
           <TouchableWithoutFeedback>
-            <View style={styles.goalPickerContainer}>
+            <Animated.View style={[
+              styles.goalPickerContainer,
+              { transform: [{ translateY: goalPickerAnim }] }
+            ]}>
               <Text style={styles.goalPickerTitle}>Select Goal</Text>
               {goalState.goals.map((goal) => (
                 <TouchableOpacity
@@ -204,7 +256,7 @@ export default function CameraScreen({ navigation }: Props) {
                   ]}
                   onPress={() => {
                     setSelectedGoalId(goal.id);
-                    setShowGoalPicker(false);
+                    closeGoalPicker();
                   }}
                 >
                   <Text style={[
@@ -218,24 +270,27 @@ export default function CameraScreen({ navigation }: Props) {
                   )}
                 </TouchableOpacity>
               ))}
-            </View>
+            </Animated.View>
           </TouchableWithoutFeedback>
-        </View>
+        </Animated.View>
       </TouchableWithoutFeedback>
     </Modal>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <CameraView 
-        style={styles.camera} 
-        facing={type} 
-        ref={cameraRef}
-        animateShutter={false}
-      >
+    <GestureDetector gesture={doubleTap}>
+      <SafeAreaView style={styles.container}>
+        <CameraView
+          style={styles.camera}
+          facing={facing}
+          ref={cameraRef}
+          animateShutter={false}
+        />
         <View style={styles.cameraContainer}>
           {/* Captured image overlay - only show when we have the actual image */}
-          {/* Removed the image overlay to keep showing the frozen camera preview */}
+          {capturedImage && (
+            <Image source={{ uri: capturedImage }} style={styles.frozenImage} />
+          )}
 
           {/* Camera controls - hide when frozen */}
           {!isCameraFrozen && (
@@ -243,7 +298,7 @@ export default function CameraScreen({ navigation }: Props) {
               <View style={styles.cameraTopControls}>
                 <TouchableOpacity
                   style={styles.flipButton}
-                  onPress={() => setType(type === 'back' ? 'front' : 'back')}
+                  onPress={() => setFacing(facing === 'back' ? 'front' : 'back')}
                 >
                   <Ionicons name="camera-reverse" size={30} color="white" />
                 </TouchableOpacity>
@@ -270,7 +325,7 @@ export default function CameraScreen({ navigation }: Props) {
             <>
               {/* Top bar with close and download */}
               <View style={styles.capturedTopBar}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.iconButton}
                   onPress={resetCapture}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -279,16 +334,16 @@ export default function CameraScreen({ navigation }: Props) {
                 </TouchableOpacity>
 
                 {/* Replace download button with significant milestone toggle */}
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.iconButton, styles.milestoneToggle]}
                   onPress={() => setIsMilestone(!isMilestone)}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
                   <View style={[styles.starButton, isMilestone && styles.starButtonActive]}>
-                    <FontAwesome5 
-                      name="star" 
-                      size={20} 
-                      color={isMilestone ? "#FFD700" : "rgba(255,255,255,0.7)"} 
+                    <FontAwesome5
+                      name="star"
+                      size={20}
+                      color={isMilestone ? "#FFD700" : "rgba(255,255,255,0.7)"}
                     />
                   </View>
                 </TouchableOpacity>
@@ -296,16 +351,16 @@ export default function CameraScreen({ navigation }: Props) {
 
               {/* Caption area */}
               {!showCaption && !caption ? (
-                <TouchableOpacity 
-                  style={styles.captionTouchArea} 
+                <TouchableOpacity
+                  style={styles.captionTouchArea}
                   activeOpacity={1}
                   onPress={showCaptionInput}
                 >
                   {/* Remove the "Add Caption" visual prompt */}
                 </TouchableOpacity>
               ) : !showCaption && caption ? (
-                <TouchableOpacity 
-                  style={styles.captionTouchArea} 
+                <TouchableOpacity
+                  style={styles.captionTouchArea}
                   activeOpacity={1}
                   onPress={showCaptionInput}
                 >
@@ -314,7 +369,7 @@ export default function CameraScreen({ navigation }: Props) {
                   </View>
                 </TouchableOpacity>
               ) : (
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.captionTouchArea}
                   activeOpacity={1}
                   onPress={hideCaptionInput}
@@ -342,12 +397,12 @@ export default function CameraScreen({ navigation }: Props) {
               {/* Bottom action bar */}
               <View style={styles.capturedBottomBar}>
                 {/* Goal selector */}
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.goalSelectorCompact}
                   onPress={() => setShowGoalPicker(true)}
                 >
                   <Text style={styles.goalSelectorCompactText}>
-                    {selectedGoalId 
+                    {selectedGoalId
                       ? goalState.goals.find(g => g.id === selectedGoalId)?.title.substring(0, 15) + '...'
                       : 'Goal'}
                   </Text>
@@ -355,7 +410,7 @@ export default function CameraScreen({ navigation }: Props) {
                 </TouchableOpacity>
 
                 {/* Upload button - replacing story button */}
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.uploadButton, !capturedImage && styles.disabledButton]}
                   onPress={handleAddToStory}
                   disabled={!capturedImage}
@@ -368,9 +423,9 @@ export default function CameraScreen({ navigation }: Props) {
             </>
           )}
         </View>
-      </CameraView>
-      {renderGoalPicker()}
-    </SafeAreaView>
+        {renderGoalPicker()}
+      </SafeAreaView>
+    </GestureDetector>
   );
 }
 
@@ -383,7 +438,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   cameraContainer: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'transparent',
     justifyContent: 'space-between',
   },
@@ -674,4 +729,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginRight: 6,
   },
-}); 
+});'' 

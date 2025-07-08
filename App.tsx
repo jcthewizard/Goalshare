@@ -1,3 +1,5 @@
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+
 // @ts-nocheck
 import React from 'react';
 import { Provider as PaperProvider, DefaultTheme } from 'react-native-paper';
@@ -59,13 +61,15 @@ const theme = {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <GoalProvider>
-        <PaperProvider theme={theme}>
-          <StatusBar barStyle="dark-content" backgroundColor={theme.colors.background} animated={true} />
-          <Navigation />
-        </PaperProvider>
-      </GoalProvider>
-    </AuthProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AuthProvider>
+        <GoalProvider>
+          <PaperProvider theme={theme}>
+            <StatusBar barStyle="dark-content" backgroundColor={theme.colors.background} animated={true} />
+            <Navigation />
+          </PaperProvider>
+        </GoalProvider>
+      </AuthProvider>
+    </GestureHandlerRootView>
   );
 }
