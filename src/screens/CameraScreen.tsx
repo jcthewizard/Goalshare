@@ -199,7 +199,7 @@ export default function CameraScreen({ navigation }: Props) {
       });
 
       resetCapture();
-      navigation.jumpTo('Home');
+      navigation.navigate('Main', { screen: 'Home' });
     } catch (error) {
       console.error('Failed to add to timeline:', error);
     }
@@ -392,7 +392,9 @@ export default function CameraScreen({ navigation }: Props) {
                   activeOpacity={1}
                   onPress={showCaptionInput}
                 >
-                  {/* Remove the "Add Caption" visual prompt */}
+                  <View style={styles.captionHintContainer}>
+                    <Text style={styles.captionHintText}>Tap to add caption</Text>
+                  </View>
                 </TouchableOpacity>
               ) : !showCaption && caption ? (
                 <TouchableOpacity
@@ -402,6 +404,7 @@ export default function CameraScreen({ navigation }: Props) {
                 >
                   <View style={styles.captionDisplayContainer}>
                     <Text style={styles.captionDisplayText}>{caption}</Text>
+                    <Text style={styles.captionEditHint}>Tap to edit</Text>
                   </View>
                 </TouchableOpacity>
               ) : (
@@ -425,6 +428,7 @@ export default function CameraScreen({ navigation }: Props) {
                         returnKeyType="done"
                         blurOnSubmit={true}
                       />
+                      <Text style={styles.captionCounter}>{caption.length}/100</Text>
                     </Animated.View>
                   </TouchableWithoutFeedback>
                 </TouchableOpacity>
@@ -764,5 +768,30 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginRight: 6,
+  },
+  captionHintContainer: {
+    padding: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 20,
+    alignItems: 'center',
+  },
+  captionHintText: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  captionEditHint: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 12,
+    fontWeight: '400',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  captionCounter: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 8,
+    textAlign: 'center',
   },
 });

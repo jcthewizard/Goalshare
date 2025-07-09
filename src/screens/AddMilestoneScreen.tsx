@@ -108,14 +108,23 @@ const AddMilestoneScreen: React.FC<Props> = ({ route, navigation }) => {
     setLoading(true);
 
     try {
+      // Optimistic UI - immediately navigate to home screen
+      navigation.navigate('Main', { screen: 'Home' });
+
+      // Show success feedback immediately
+      // We'll handle the actual API call in the background
       await addMilestone(goalId, {
         title,
         description,
         isMilestone
       });
-      navigation.goBack();
+
+      // The navigation already happened above, so we don't need to call goBack()
     } catch (error) {
-      Alert.alert('Error', error instanceof Error ? error.message : 'An error occurred');
+      // If there's an error, show it to the user
+      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to add milestone');
+      // Navigate back to the current screen to let user retry
+      navigation.goBack();
     } finally {
       setLoading(false);
     }

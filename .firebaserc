@@ -1,0 +1,11 @@
+{
+  "projects": {
+    "default": "goalshare-app-f7c0b"
+  },
+  "targets": {},
+  "etags": {
+    "goalshare-app-f7c0b": {
+      "extensionInstances": {}
+    }
+  }
+}

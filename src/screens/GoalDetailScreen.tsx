@@ -799,8 +799,6 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                                               ]
                                             }
                                           ]}>
-                                            {/* Remove the edit milestone option */}
-
                                             <TouchableOpacity
                                               style={styles.dropdownOption}
                                               onPress={() => {
@@ -905,7 +903,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                                 onPress={() => handleCompleteMilestone(step.id)}
                                 activeOpacity={0.7}
                               >
-                                {/* Empty checkbox for todo items */}
+                                <View />
                               </TouchableOpacity>
 
                               {/* Step Content */}
