@@ -721,7 +721,7 @@ const GoalDetailScreen: React.FC<Props> = ({ route, navigation }: Props): React.
                       <Text style={styles.emptyStateText}>Complete steps to see your progress here</Text>
                     ) : (
                       <View style={styles.timelineContainer}>
-                        {completedSteps.map((milestone, index) => {
+                        {completedSteps.slice().reverse().map((milestone, index) => {
                           // Get pre-created animation values for this milestone
                           const animations = milestoneAnimRefs.current[milestone.id] || {
                             fade: new Animated.Value(1),

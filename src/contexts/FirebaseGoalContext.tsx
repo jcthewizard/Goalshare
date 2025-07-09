@@ -225,7 +225,7 @@ export const GoalProvider: React.FC<GoalProviderProps> = ({ children }) => {
         id: Date.now().toString(), // Simple ID generation
         title: itemData.title || 'Timeline item',
         description: itemData.description || '',
-        imageUri: imageUrl,
+        imageUri: imageUrl || null,
         isMilestone: itemData.isMilestone || false,
         createdAt: new Date()
       };
@@ -290,7 +290,8 @@ export const GoalProvider: React.FC<GoalProviderProps> = ({ children }) => {
         id: Date.now().toString(), // Simple ID generation
         title: milestoneData.title || 'Milestone',
         description: milestoneData.description || '',
-        imageUri: imageUrl,
+        imageUri: imageUrl || null,
+        targetDate: milestoneData.targetDate || null,
         isMilestone: true,
         createdAt: new Date()
       };
